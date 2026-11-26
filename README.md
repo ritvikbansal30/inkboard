@@ -22,5 +22,12 @@ Open **Tablet** in the top bar: test pad, pressure curve, thinnest line, pen-but
 Driver: Work Area → built-in display + Proportional; lower pen button = Right click, upper = Middle click.
 Press **F** for focus mode; with a 16:10 page the tablet surface maps one-to-one onto the page.
 
+## Drawboard-style tools
+- **Pens bar** with real pen icons (switch to colour dots in any pen's settings → Pen bar).
+- **Ruler (G) and protractor:** drag to move, drag the green knob to rotate (snaps to 0/45/90°, Shift = 15° steps). Start a stroke on the ruler's edge and it draws perfectly straight; start on the protractor's arc to draw arcs. The protractor shows θ live as you hover.
+- **Radial menu (Q, or set a pen button to "Radial menu"):** pens, eraser, select and laser in a circle around your pen; centre = undo.
+- **Laser** (click the laser tool again): Dot, Trail, Fading ink (write and it vanishes) or Spotlight, in 6 colours, with size and fade time.
+- **Straight highlighter** option, **tick / cross / star stamps** (click to stamp, drag to size), **bookmarks (M)** with a Bookmarks filter in the sidebar, and a **highlights-only eraser**.
+
 ## Update
 `git pull` in this folder, then reload Inkboard twice (the offline cache updates on the first load).
