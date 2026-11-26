@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Inkboard</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#15171c">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="tb-left">
+      <button class="ibtn" id="btnLibrary" title="All notebooks (Cmd+O)" data-icon="grid"></button>
+      <button class="ibtn" id="btnSidebar" title="Page thumbnails" data-icon="sidebar"></button>
+      <input id="nbName" spellcheck="false" title="Rename notebook">
+      <span id="saveState"></span>
+    </div>
+    <div class="tb-center">
+      <button class="ibtn" id="prevPage" title="Previous page (←)" data-icon="left"></button>
+      <div class="pager"><input id="pageInput" inputmode="numeric"><span id="pageCount">/ 1</span></div>
+      <button class="ibtn" id="nextPage" title="Next page (→)" data-icon="right"></button>
+      <button class="ibtn" id="addPage" title="New blank page after this one (B)" data-icon="plus"></button>
+      <button class="ibtn" id="pageMenu" title="Page options" data-icon="dots"></button>
+    </div>
+    <div class="tb-right">
+      <button class="tbtn" id="btnBg" data-icon="layers">Background</button>
+      <button class="tbtn" id="btnInsert" data-icon="plusbox">Insert</button>
+      <button class="tbtn" id="btnExport" data-icon="download">Export</button>
+      <button class="ibtn" id="btnPresent" title="Tablet focus mode: full screen, page fills the screen (F)" data-icon="maximize"></button>
+      <button class="ibtn" id="btnHelp" title="Shortcuts (?)" data-icon="help"></button>
+    </div>
+  </header>
+  <div id="main">
+    <aside id="sidebar"><div id="thumbs"></div></aside>
+    <div id="stage">
+      <canvas id="bgC"></canvas>
+      <canvas id="hlC"></canvas>
+      <canvas id="inkC"></canvas>
+      <canvas id="liveC"></canvas>
+      <div id="selBar" hidden>
+        <button data-act="dup" title="Duplicate (Cmd+D)" data-icon="copy"></button>
+        <button data-act="front" title="Bring to front" data-icon="front"></button>
+        <button data-act="back" title="Send to back" data-icon="back"></button>
+        <button data-act="del" title="Delete (Del)" data-icon="trash"></button>
+      </div>
+      <div id="zoomCtl">
+        <button id="zoomOut" title="Zoom out (Cmd -)" data-icon="minus"></button>
+        <button id="zoomPct" title="Fit page (Cmd 0)">100%</button>
+        <button id="zoomIn" title="Zoom in (Cmd +)" data-icon="plus"></button>
+      </div>
+      <div id="dropHint" hidden>Drop a PDF or image</div>
+    </div>
+  </div>
+  <div id="dock"></div>
+  <div id="popover" hidden></div>
+  <div id="home" hidden></div>
+  <div id="modal" hidden><div class="modal-card"></div></div>
+  <div id="toast"></div>
+  <input type="file" id="filePdf" accept="application/pdf" hidden>
+  <input type="file" id="fileImg" accept="image/*" hidden>
+  <input type="file" id="fileBackup" accept=".inkboard,application/json" hidden>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
