@@ -1,6 +1,6 @@
 // Inkboard offline cache: the app keeps working when the local server is off.
-const CACHE = 'inkboard-v6';
-const CORE = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon.svg', './icon-512.png',
+const CACHE = 'inkboard-v7';
+const CORE = ['./', './index.html', './styles.css', './app.js', './physics.js', './manifest.webmanifest', './icon.svg', './icon-512.png',
   './vendor/pdf.min.mjs', './vendor/pdf.worker.min.mjs', './vendor/perfect-freehand.mjs', './vendor/pdf-lib.esm.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

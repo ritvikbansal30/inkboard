@@ -31,3 +31,11 @@ Press **F** for focus mode; with a 16:10 page the tablet surface maps one-to-one
 
 ## Update
 `git pull` in this folder, then reload Inkboard twice (the offline cache updates on the first load).
+
+## Shapes & physics library (K)
+Open with the atom button in the toolbar or press **K**. 125 vector shapes in 10 chapters: Shapes & Axes, Modern Physics, Ray Optics, Wave Optics, Electrostatics, Current Electricity, Magnetism & EMI, Semiconductors, Mechanics, and Heat, Waves & Gravitation.
+Click a shape, then click the page to drop it (or drag to size it); keep clicking to place more. Select a placed shape to move, resize, rotate (15° steps), flip, recolour or delete it. "Natural colours" keeps protons red, electrons blue and so on; pick any colour to override.
+Modern Physics includes ready-made derivation diagrams: Bohr atom, H-atom energy levels, Lyman/Balmer/Paschen series, photoelectric setup, Kmax–ν and I–V graphs, decay curve, BE/A curve, fission, fusion, β-decay, Rutherford scattering, matter wave, orbit standing wave and X-ray spectrum.
+
+## Tables
+Insert → Table… (or the Table button in the library). Type straight into cells; Tab moves to the next cell and adds a row at the end. Double-click a cell to edit it later. When a table is selected, its toolbar adds/removes rows and columns and toggles the header row.

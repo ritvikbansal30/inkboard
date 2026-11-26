@@ -46,6 +46,14 @@
         <button data-act="dup" title="Duplicate (Cmd+D)" data-icon="copy"></button>
         <button data-act="front" title="Bring to front" data-icon="front"></button>
         <button data-act="back" title="Send to back" data-icon="back"></button>
+        <button data-act="rotl" class="symb" title="Rotate left 15°" data-icon="rotl"></button>
+        <button data-act="rotr" class="symb" title="Rotate right 15°" data-icon="rotr"></button>
+        <button data-act="flip" class="symb" title="Flip" data-icon="flip"></button>
+        <button data-act="row+" class="tbl" title="Add row" data-icon="rowplus"></button>
+        <button data-act="row-" class="tbl" title="Remove last row" data-icon="rowminus"></button>
+        <button data-act="col+" class="tbl" title="Add column" data-icon="colplus"></button>
+        <button data-act="col-" class="tbl" title="Remove last column" data-icon="colminus"></button>
+        <button data-act="head" class="tbl" title="Header row on/off" data-icon="header"></button>
         <button data-act="del" title="Delete (Del)" data-icon="trash"></button>
       </div>
       <div id="zoomCtl">
@@ -55,6 +63,7 @@
       </div>
       <div id="dropHint" hidden>Drop a PDF or image</div>
     </div>
+    <aside id="lib" hidden></aside>
   </div>
   <div id="dock"></div>
   <div id="popover" hidden></div>
