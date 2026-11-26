@@ -1490,6 +1490,18 @@ const HS = { q: '', sort: 'recent', f: 'all', metas: [], disk: [], perm: 'none' 
 let installEvt = null;
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!home.hidden) renderHome(); });
 function closeHome() { home.hidden = true; }
+function showInstallHelp() {
+  card.innerHTML = `<h2>Install Inkboard as an app</h2>
+    <div class="sub">This browser can't install web apps, so here are two ways to get Inkboard in your Dock.</div>
+    <ol class="tablet-steps">
+      <li><b>Easiest:</b> in your Inkboard folder, double-click <b>Make Inkboard App.command</b>. It puts <b>Inkboard.app</b> in your Applications folder; drag it to the Dock. It opens Inkboard in its own window (needs Google Chrome, Edge or Brave installed).</li>
+      <li><b>Or</b> open <b>http://127.0.0.1:8777</b> in Google Chrome and click <b>Install as app</b> here, or the install icon in Chrome's address bar.</li>
+    </ol>
+    <h3>Bring your notebooks with you</h3>
+    <div class="note">Each browser keeps its own notes. Before switching, click <b>Choose notes folder</b> on the dashboard and <b>Save all</b>. In the app, choose the same folder and your notebooks appear there. A backup file (Export → Backup) works too.</div>
+    <div class="btnrow"><button class="pbtn primary" data-close>Got it</button></div>`;
+  modal.hidden = false; card.querySelector('[data-close]').onclick = closeModal;
+}
 async function openHome() {
   if (S.editingText) finishText();
   closePopover(); closeModal();
@@ -1538,7 +1550,7 @@ function renderHome(focusSearch) {
       <button class="pbtn" data-a="pdf">${icon('file')}Open PDF…</button>
       <button class="pbtn" data-a="import">${icon('folder')}Import notes…</button>
       <button class="pbtn" data-a="restore">${icon('upload')}Import backup file…</button>
-      ${installEvt ? `<button class="pbtn" data-a="install">${icon('download')}Install as app</button>` : ''}
+      ${matchMedia('(display-mode: standalone)').matches ? '' : `<button class="pbtn" data-a="install">${icon('download')}Install as app</button>`}
     </div>
     <div class="home-tools"><input id="hSearch" placeholder="Search notebooks" value="${esc(HS.q)}" spellcheck="false">
       ${seg('f', HS.f, [['all', 'All'], ['pdf', 'PDFs'], ['board', 'Boards']])}${seg('s', HS.sort, [['recent', 'Recent'], ['name', 'Name'], ['pages', 'Pages']])}</div>
@@ -1560,7 +1572,7 @@ function renderHome(focusSearch) {
   on('pdf', () => pickFile('#filePdf', f => { closeHome(); importPdf(f, false); }));
   on('restore', () => pickFile('#fileBackup', f => { closeHome(); importBackup(f); }));
   on('import', importNotesFolder);
-  on('install', async () => { const ev = installEvt; installEvt = null; await ev.prompt(); renderHome(); });
+  on('install', async () => { if (installEvt) { const ev = installEvt; installEvt = null; await ev.prompt(); return renderHome(); } showInstallHelp(); });
   on('folder', async () => { if (await chooseFolder()) { await loadHome(); renderHome(); } });
   on('reconnect', async () => { await fsPerm(true); await loadHome(); renderHome(); });
   on('saveall', saveAll);
