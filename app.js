@@ -48,6 +48,8 @@ const IC = {
   save: '<path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8M7 21v-7h10v7"/>',
   upload: '<path d="M12 20V9M7 14l5-5 5 5M5 4h14"/>',
   extend: '<path d="M12 5v14M6 13l6 6 6-6M4 3h16"/>',
+  pen: '<path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/><path d="M14 6l3 3"/>',
+  folder: '<path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   // shapes
   s_line: '<path d="M5 19L19 5"/>',
   s_arrow: '<path d="M5 19L19 5M10 5h9v9"/>',
@@ -80,6 +82,7 @@ const DB = {
   get(s, k) { return this.req(s, 'readonly', o => o.get(k)); },
   put(s, v, k) { return this.req(s, 'readwrite', o => k === undefined ? o.put(v) : o.put(v, k)); },
   del(s, k) { return this.req(s, 'readwrite', o => o.delete(k)); },
+  has(s, k) { return this.req(s, 'readonly', o => o.getKey(k)); },
   all(s) { return this.req(s, 'readonly', o => o.getAll()); },
 };
 
@@ -108,7 +111,7 @@ const BG_COLORS = [['#ffffff', 'White'], ['#f7f3e8', 'Paper'], ['#eef1f4', 'Mist
   ['#111316', 'Black'], ['#1f3b2d', 'Chalkboard'], ['#14213d', 'Navy'], ['#2b2f36', 'Slate'], ['#3a2a20', 'Cocoa'], ['#2a1f3d', 'Plum']];
 const PATTERNS = [['none', 'Plain'], ['grid', 'Boxes'], ['graph', 'Graph'], ['dots', 'Dots'], ['iso', 'Iso dots'], ['lines', 'Ruled'], ['cornell', 'Cornell'], ['staff', 'Columns']];
 const GAPS = [[24, 'Small'], [40, 'Medium'], [64, 'Large']];
-const SIZES = { wide: [1600, 900, '16:9'], std: [1600, 1200, '4:3'], a4: [1240, 1754, 'A4'], square: [1400, 1400, 'Square'] };
+const SIZES = { wide: [1600, 900, '16:9'], tablet: [1600, 1000, '16:10'], std: [1600, 1200, '4:3'], a4: [1240, 1754, 'A4'], square: [1400, 1400, 'Square'] };
 const SHAPES = ['line', 'arrow', 'darrow', 'rect', 'ellipse', 'triangle', 'diamond', 'axes'];
 const SHAPE_NAMES = { line: 'Line', arrow: 'Arrow', darrow: 'Double arrow', rect: 'Rectangle', ellipse: 'Ellipse', triangle: 'Triangle', diamond: 'Diamond', axes: 'Axes' };
 
@@ -130,13 +133,14 @@ const S = {
   recent: LS.get('recent', []),
   defaultBg: LS.get('defaultBg', { color: '#ffffff', pattern: 'none', gap: 40, image: null }),
   pageSize: LS.get('pageSize', 'wide'),
+  tablet: Object.assign({ curve: 'normal', min: 0.12, btn2: 'eraser', btn1: 'pan', snap: true, ring: true }, LS.get('tablet', {})),
   view: { scale: 1, x: 0, y: 0 },
   sel: new Set(),
   undo: [], redo: [],
   hover: null, laser: [], editingText: null, hiddenId: null, present: false,
 };
 const activePreset = () => S.presets.find(p => p.id === S.activePreset) || S.presets[0];
-const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); };
+const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); LS.set('tablet', S.tablet); };
 const curPage = () => S.nb.pages[S.pageIdx];
 
 /* ================= geometry: items → drawable ops ================= */
@@ -419,7 +423,7 @@ function drawInk() {
 function drawLive() {
   const ctx = X.live; clearCtx(ctx); setView(ctx);
   const sc = S.view.scale;
-  if (drag?.mode === 'ink') drawOps(ctx, computeOps(drag.item, true));
+  if (drag?.mode === 'ink') drawOps(ctx, computeOps(drag.pred?.length ? { ...drag.item, pts: drag.item.pts.concat(drag.pred) } : drag.item, true));
   if (drag?.mode === 'shape') drawOps(ctx, computeOps(drag.s));
   if (drag?.mode === 'lasso' && drag.pts.length > 1) {
     ctx.beginPath(); drag.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
@@ -441,6 +445,11 @@ function drawLive() {
     ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fill();
     ctx.lineWidth = 1.5 / sc; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.stroke();
     ctx.beginPath(); ctx.arc(h.x, h.y, r + 1.5 / sc, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1 / sc; ctx.stroke();
+  }
+  if (h && !drag && S.tool === 'ink' && S.tablet.ring) {
+    const r = Math.max(activePreset().size / 2, 1.5 / sc);
+    ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, 7); ctx.lineWidth = 1 / sc; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(h.x, h.y, r + 1 / sc, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.stroke();
   }
   // laser
   const now = performance.now(), LIFE = 900;
@@ -503,18 +512,17 @@ function redo() { const h = S.redo.pop(); if (!h) return; applyHist(h, 'after');
 let saving = false;
 const saveNow = async () => {
   if (!S.nb) return;
-  S.nb.updated = Date.now();
   try {
     saving = true; $('#saveState').textContent = 'Saving…';
     await DB.put('notebooks', S.nb);
-    const meta = { id: S.nb.id, name: S.nb.name, updated: S.nb.updated, pages: S.nb.pages.length, kind: S.nb.pages.some(p => p.kind === 'pdf') ? 'pdf' : 'board', cover: coverImage() };
+    const meta = { id: S.nb.id, name: S.nb.name, updated: S.nb.updated, savedAt: S.nb.savedAt || 0, file: S.nb.file || null, pages: S.nb.pages.length, kind: S.nb.pages.some(p => p.kind === 'pdf') ? 'pdf' : 'board', cover: coverImage() };
     await DB.put('meta', meta);
-    $('#saveState').textContent = 'Saved';
+    $('#saveState').textContent = 'Autosaved';
   } catch (e) { console.error(e); $('#saveState').textContent = 'Save failed!'; toast('Could not save: ' + e.message, 4000); }
   saving = false;
 };
 const saveSoon = debounce(saveNow, 700);
-function markSave() { $('#saveState').textContent = 'Edited'; saveSoon(); }
+function markSave() { if (S.nb) S.nb.updated = Date.now(); $('#saveState').textContent = 'Editing…'; saveSoon(); updateSaveUI(); }
 function coverImage() {
   const c = document.querySelector('.thumb[data-i="0"] canvas');
   try { return c && c.dataset.drawn ? c.toDataURL('image/jpeg', 0.7) : (S.nb._cover || null); } catch { return null; }
@@ -525,25 +533,36 @@ let drag = null, spaceDown = false;
 const capture = e => { try { stage.setPointerCapture(e.pointerId); } catch {} };
 const HOLD_MS = 550;
 function evPt(e) { const r = stage.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top; return { sx, sy, x: (sx - S.view.x) / S.view.scale, y: (sy - S.view.y) / S.view.scale }; }
-function pressureOf(e, preset) { return (e.pointerType === 'pen' && preset.pressure) ? clamp(e.pressure || 0.5, 0.05, 1) : 0.5; }
+const CURVES = { soft: 0.55, normal: 1, firm: 1.7 };
+function curvePressure(raw) { const m = S.tablet.min, g = CURVES[S.tablet.curve] || 1; return clamp(m + (1 - m) * Math.pow(clamp(raw, 0.001, 1), g), 0.03, 1); }
+function pressureOf(e, preset) { return (e.pointerType === 'pen' && preset.pressure) ? curvePressure(e.pressure || 0.5) : 0.5; }
+function buttonAction(e) {
+  if (e.button === 5 || (e.buttons & 32)) return 'eraser';
+  if (e.button === 2) return S.tablet.btn2;
+  if (e.button === 1) return e.pointerType === 'pen' ? S.tablet.btn1 : 'pan';
+  return null;
+}
 
 stage.addEventListener('pointerdown', e => {
   closePopover();
   if (S.editingText) { const was = S.editingText; finishText(); if (S.tool === 'text' && !was.fresh) return; if (S.tool === 'text') return; }
   const P = evPt(e); S.hover = P;
-  if (e.button === 1 || spaceDown || S.tool === 'hand') {
+  const act = buttonAction(e);
+  if (act === 'none') return;
+  if (act === 'undo') { e.preventDefault(); undo(); return; }
+  if (act === 'pan' || spaceDown || S.tool === 'hand') {
     drag = { mode: 'pan', sx: e.clientX, sy: e.clientY, vx: S.view.x, vy: S.view.y };
     capture(e); stage.classList.add('panning'); return;
   }
   let tool = S.tool;
-  if (e.pointerType === 'pen' && (e.button === 5 || (e.buttons & 32) || e.button === 2)) tool = 'eraser';
+  if (act) tool = act;
   else if (e.button !== 0) return;
   capture(e);
   const page = curPage();
   if (tool === 'ink') {
     const pr = activePreset();
     drag = {
-      mode: 'ink', anchor: { sx: P.sx, sy: P.sy }, holdT: setTimeout(holdSnap, HOLD_MS),
+      mode: 'ink', anchor: { sx: P.sx, sy: P.sy }, holdT: S.tablet.snap ? setTimeout(holdSnap, HOLD_MS) : 0,
       item: { t: 'ink', hl: pr.kind === 'highlighter', color: pr.color, size: pr.size, opacity: pr.opacity, style: pr.style,
         sim: e.pointerType !== 'pen' && pr.pressure && pr.kind === 'pen', pts: [[r2(P.x), r2(P.y), pressureOf(e, pr)]] },
     };
@@ -581,14 +600,15 @@ stage.addEventListener('pointerdown', e => {
 });
 stage.addEventListener('pointermove', e => {
   const P = evPt(e); S.hover = P;
-  if (!drag) { if (S.tool === 'eraser' || S.tool === 'laser') invalidate('live'); return; }
+  if (!drag) { if (S.tool === 'eraser' || S.tool === 'laser' || (S.tool === 'ink' && S.tablet.ring)) invalidate('live'); return; }
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
   switch (drag.mode) {
     case 'pan': S.view.x = drag.vx + e.clientX - drag.sx; S.view.y = drag.vy + e.clientY - drag.sy; S.autoFit = false; viewChanged(); return;
     case 'ink': {
       const pr = activePreset();
       for (const ev of evs.length ? evs : [e]) { const q = evPt(ev); drag.item.pts.push([r2(q.x), r2(q.y), pressureOf(ev, pr)]); }
-      if (Math.hypot(P.sx - drag.anchor.sx, P.sy - drag.anchor.sy) > 5) { drag.anchor = { sx: P.sx, sy: P.sy }; clearTimeout(drag.holdT); drag.holdT = setTimeout(holdSnap, HOLD_MS); }
+      drag.pred = (e.getPredictedEvents ? e.getPredictedEvents() : []).slice(0, 3).map(ev => { const q = evPt(ev); return [r2(q.x), r2(q.y), pressureOf(ev, pr)]; });
+      if (S.tablet.snap && Math.hypot(P.sx - drag.anchor.sx, P.sy - drag.anchor.sy) > 5) { drag.anchor = { sx: P.sx, sy: P.sy }; clearTimeout(drag.holdT); drag.holdT = setTimeout(holdSnap, HOLD_MS); }
       break;
     }
     case 'shape': if (drag.follow) setShapeEnd(drag.s, P.x, P.y, e.shiftKey); break;
@@ -1313,7 +1333,7 @@ async function openNotebook(nb) {
   nb.sources ||= {};
   pdfCache.clear(); thumbPdf.clear(); pdfDocs.clear();
   $('#nbName').value = nb.name; document.title = nb.name + ' — Inkboard';
-  LS.set('last', nb.id);
+  LS.set('last', nb.id); updateSaveUI();
   buildThumbs(); gotoPage(nb.lastPage || 0);
 }
 const modal = $('#modal'), card = modal.querySelector('.modal-card');
@@ -1349,6 +1369,7 @@ async function openLibrary() {
 }
 async function deleteNotebook(id) {
   const nb = await DB.get('notebooks', id);
+  if (nb?.file && await fsPerm(false)) { try { await FS.dir.removeEntry(nb.file, { recursive: true }); } catch {} }
   if (nb) {
     const keys = new Set(Object.values(nb.sources || {}).map(s => s.blob));
     for (const p of nb.pages) { if (p.bg?.image) keys.add(p.bg.image); for (const it of p.items) if (it.t === 'img') keys.add(it.key); }
@@ -1376,69 +1397,111 @@ function openHelp() {
 
 /* ================= dashboard ================= */
 const home = $('#home');
-const HS = { q: '', sort: 'recent', f: 'all', metas: [] };
+const HS = { q: '', sort: 'recent', f: 'all', metas: [], disk: [], perm: 'none' };
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!home.hidden) renderHome(); });
 function closeHome() { home.hidden = true; }
 async function openHome() {
   if (S.editingText) finishText();
   closePopover(); closeModal();
   if (S.nb) await saveNow();
+  home.hidden = false; await loadHome(); renderHome();
+}
+async function loadHome() {
   HS.metas = await DB.all('meta');
-  home.hidden = false; renderHome();
+  HS.perm = FS.dir ? await FS.dir.queryPermission({ mode: 'readwrite' }).catch(() => 'denied') : 'none';
+  HS.disk = HS.perm === 'granted' ? await scanFolder() : [];
+}
+function homeEntries() {
+  const map = new Map(HS.metas.map(m => [m.id, { ...m }]));
+  for (const d of HS.disk) {
+    const e = map.get(d.id);
+    if (!e) map.set(d.id, { ...d, diskOnly: true });
+    else { e.dir = d.dir; e.dirName = d.dirName; if ((d.updated || 0) > (e.updated || 0) + 1000) e.newer = true; }
+  }
+  return [...map.values()];
+}
+function cardBadges(m) {
+  const b = [`<span class="badge ${m.kind === 'pdf' ? 'pdf' : ''}">${m.kind === 'pdf' ? 'PDF' : 'Board'}</span>`];
+  if (m.diskOnly) b.push('<span class="badge disk">In folder</span>');
+  else if (m.newer) b.push('<span class="badge disk">Newer in folder</span>');
+  else if (FS.dir && (!m.savedAt || (m.updated || 0) > m.savedAt)) b.push('<span class="badge warn">Unsaved</span>');
+  return b.join('');
 }
 function renderHome(focusSearch) {
-  const q = HS.q.trim().toLowerCase(), all = HS.metas;
-  const list = all.filter(m => !q || m.name.toLowerCase().includes(q)).filter(m => HS.f === 'all' || (m.kind || 'board') === HS.f)
-    .sort(HS.sort === 'name' ? (a, b) => a.name.localeCompare(b.name) : HS.sort === 'pages' ? (a, b) => b.pages - a.pages : (a, b) => b.updated - a.updated);
+  const all = homeEntries(), q = HS.q.trim().toLowerCase();
+  const list = all.filter(m => !q || (m.name || '').toLowerCase().includes(q)).filter(m => HS.f === 'all' || (m.kind || 'board') === HS.f)
+    .sort(HS.sort === 'name' ? (a, b) => (a.name || '').localeCompare(b.name || '') : HS.sort === 'pages' ? (a, b) => (b.pages || 0) - (a.pages || 0) : (a, b) => (b.updated || 0) - (a.updated || 0));
   const pages = all.reduce((s, m) => s + (m.pages || 0), 0);
+  const unsaved = FS.dir ? all.filter(m => !m.diskOnly && (!m.savedAt || (m.updated || 0) > m.savedAt)).length : 0;
   const seg = (attr, cur, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-${attr}="${v}" class="${cur === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  const folderBar = !FS.dir
+    ? `${icon('folder')}<span>Your notes autosave in this browser. Choose a <b>notes folder</b> to also keep real files you can back up or sync through iCloud Drive.</span><button class="pbtn primary" data-a="folder">Choose notes folder</button>`
+    : HS.perm !== 'granted'
+      ? `${icon('folder')}<span>Notes folder <b>${esc(FS.dir.name)}</b> needs permission again.</span><button class="pbtn primary" data-a="reconnect">Reconnect folder</button><button class="pbtn" data-a="folder">Change</button>`
+      : `${icon('folder')}<span>Notes folder: <b>${esc(FS.dir.name)}</b>${unsaved ? ` · <span class="warnt">${unsaved} with unsaved changes</span>` : ' · everything saved'}</span>${unsaved ? '<button class="pbtn primary" data-a="saveall">Save all</button>' : ''}<button class="pbtn" data-a="folder">Change</button>`;
   home.innerHTML = `<div class="home-wrap">
     <div class="home-top"><h1>Notebooks</h1>${S.nb ? `<button class="pbtn" data-a="back">${icon('left')}Back to ${esc(S.nb.name)}</button>` : ''}</div>
-    <div class="home-sub">${all.length} notebook${all.length === 1 ? '' : 's'} · ${pages} pages · saved on this computer</div>
+    <div class="home-sub">${all.length} notebook${all.length === 1 ? '' : 's'} · ${pages} pages</div>
+    <div class="folderbar">${folderBar}</div>
     <div class="lib-actions">
       <button class="pbtn primary" data-a="board">${icon('plus')}New whiteboard</button>
       <button class="pbtn" data-a="pdf">${icon('file')}Open PDF…</button>
-      <button class="pbtn" data-a="restore">${icon('upload')}Restore backup…</button>
+      <button class="pbtn" data-a="import">${icon('folder')}Import notes…</button>
+      <button class="pbtn" data-a="restore">${icon('upload')}Import backup file…</button>
+      ${installEvt ? `<button class="pbtn" data-a="install">${icon('download')}Install as app</button>` : ''}
     </div>
     <div class="home-tools"><input id="hSearch" placeholder="Search notebooks" value="${esc(HS.q)}" spellcheck="false">
       ${seg('f', HS.f, [['all', 'All'], ['pdf', 'PDFs'], ['board', 'Boards']])}${seg('s', HS.sort, [['recent', 'Recent'], ['name', 'Name'], ['pages', 'Pages']])}</div>
     ${list.length ? `<div class="home-grid">${list.map(m => `<div class="card${m.id === S.nb?.id ? ' cur' : ''}" data-id="${esc(m.id)}" tabindex="0">
       <div class="cov" style="${m.cover ? `background-image:url(${m.cover})` : ''}">${m.cover ? '' : icon('page')}</div>
-      <div class="meta"><div class="t">${esc(m.name)}</div><div class="d"><span class="badge ${m.kind === 'pdf' ? 'pdf' : ''}">${m.kind === 'pdf' ? 'PDF' : 'Board'}</span>${m.pages} page${m.pages === 1 ? '' : 's'} · ${new Date(m.updated).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div></div>
-      <div class="acts"><button data-ren title="Rename">${icon('text')}</button><button data-del title="Delete">${icon('trash')}</button></div></div>`).join('')}</div>`
+      <div class="meta"><div class="t">${esc(m.name || 'Untitled')}</div><div class="d">${cardBadges(m)}${m.pages || 0} page${m.pages === 1 ? '' : 's'} · ${new Date(m.updated || Date.now()).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</div></div>
+      ${m.diskOnly ? '' : `<div class="acts"><button data-ren title="Rename">${icon('text')}</button><button data-del title="Delete">${icon('trash')}</button></div>`}</div>`).join('')}</div>`
       : `<div class="empty">${all.length ? 'No notebooks match.' : 'No notebooks yet. Start a whiteboard or open a PDF.'}</div>`}
   </div>`;
   const sIn = home.querySelector('#hSearch');
   sIn.oninput = () => { HS.q = sIn.value; renderHome(true); };
   sIn.onkeydown = e => e.stopPropagation();
   if (focusSearch) { sIn.focus(); sIn.setSelectionRange(sIn.value.length, sIn.value.length); }
+  const on = (a, fn) => home.querySelector(`[data-a=${a}]`)?.addEventListener('click', fn);
   home.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { HS.f = b.dataset.f; renderHome(); });
   home.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { HS.sort = b.dataset.s; renderHome(); });
-  home.querySelector('[data-a=back]')?.addEventListener('click', closeHome);
-  home.querySelector('[data-a=board]').onclick = async () => { closeHome(); await openNotebook(newNotebook('Untitled board')); saveNow(); };
-  home.querySelector('[data-a=pdf]').onclick = () => pickFile('#filePdf', f => { closeHome(); importPdf(f, false); });
-  home.querySelector('[data-a=restore]').onclick = () => pickFile('#fileBackup', f => { closeHome(); importBackup(f); });
+  on('back', closeHome);
+  on('board', async () => { closeHome(); await openNotebook(newNotebook('Untitled board')); saveNow(); });
+  on('pdf', () => pickFile('#filePdf', f => { closeHome(); importPdf(f, false); }));
+  on('restore', () => pickFile('#fileBackup', f => { closeHome(); importBackup(f); }));
+  on('import', importNotesFolder);
+  on('install', async () => { const ev = installEvt; installEvt = null; await ev.prompt(); renderHome(); });
+  on('folder', async () => { if (await chooseFolder()) { await loadHome(); renderHome(); } });
+  on('reconnect', async () => { await fsPerm(true); await loadHome(); renderHome(); });
+  on('saveall', saveAll);
   home.querySelectorAll('.card').forEach(c => {
-    const id = c.dataset.id, m = HS.metas.find(x => x.id === id);
-    const open = async () => { const nb = await DB.get('notebooks', id); closeHome(); if (nb && nb.id !== S.nb?.id) openNotebook(nb); };
+    const id = c.dataset.id, m = all.find(x => x.id === id);
+    const open = async () => {
+      if (m.diskOnly || m.newer) return openFromDisk(m.dir, m.dirName);
+      const nb = await DB.get('notebooks', id); closeHome(); if (nb && nb.id !== S.nb?.id) openNotebook(nb);
+    };
     c.onclick = e => { if (e.target.closest('.acts,input')) return; open(); };
     c.onkeydown = e => { if (e.key === 'Enter' && e.target === c) open(); };
-    c.querySelector('[data-del]').onclick = async e => {
+    c.querySelector('[data-del]')?.addEventListener('click', async e => {
       e.stopPropagation();
-      if (!confirm(`Delete "${m.name}" permanently? This cannot be undone.`)) return;
-      await deleteNotebook(id); HS.metas = await DB.all('meta'); renderHome();
-    };
-    c.querySelector('[data-ren]').onclick = e => {
+      if (!confirm(`Delete "${m.name}" permanently?${m.file ? ' Its copy in your notes folder is deleted too.' : ''} This cannot be undone.`)) return;
+      await deleteNotebook(id); await loadHome(); renderHome();
+    });
+    c.querySelector('[data-ren]')?.addEventListener('click', e => {
       e.stopPropagation();
       const t = c.querySelector('.t'); t.innerHTML = '<input>'; const inp = t.firstChild; inp.value = m.name; inp.focus(); inp.select();
-      const done = async ok => {
+      let done = false;
+      const finish = async ok => {
+        if (done) return; done = true;
         const v = inp.value.trim(); if (!ok || !v || v === m.name) return renderHome();
-        if (S.nb?.id === id) { S.nb.name = v; $('#nbName').value = v; document.title = v + ' — Inkboard'; await saveNow(); }
-        else { const nb = await DB.get('notebooks', id); if (nb) { nb.name = v; await DB.put('notebooks', nb); } m.name = v; await DB.put('meta', m); }
-        HS.metas = await DB.all('meta'); renderHome();
+        if (S.nb?.id === id) { S.nb.name = v; $('#nbName').value = v; document.title = v + ' — Inkboard'; markSave(); await saveNow(); }
+        else { const nb = await DB.get('notebooks', id); if (nb) { nb.name = v; nb.updated = Date.now(); await DB.put('notebooks', nb); const mm = HS.metas.find(x => x.id === id); if (mm) { mm.name = v; mm.updated = nb.updated; await DB.put('meta', mm); } } }
+        await loadHome(); renderHome();
       };
-      inp.onkeydown = ev => { ev.stopPropagation(); if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); };
-      inp.onblur = () => done(true);
-    };
+      inp.onkeydown = ev => { ev.stopPropagation(); if (ev.key === 'Enter') finish(true); if (ev.key === 'Escape') finish(false); };
+      inp.onblur = () => finish(true);
+    });
   });
 }
 
@@ -1466,6 +1529,179 @@ function togglePresent() {
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && S.present) { S.present = false; document.body.classList.remove('present'); setTimeout(fitPage, 120); } });
 
+/* ================= notes folder (real files on disk) ================= */
+// Layout: <notes folder>/<Name>.inkboard/{notebook.json, meta.json, files/<blob key>}
+const FS = { dir: null };
+async function fsPerm(ask) {
+  if (!FS.dir) return false;
+  const o = { mode: 'readwrite' };
+  try { if (await FS.dir.queryPermission(o) === 'granted') return true; return !!ask && (await FS.dir.requestPermission(o)) === 'granted'; }
+  catch { return false; }
+}
+async function chooseFolder() {
+  if (!window.showDirectoryPicker) { toast('Saving to a folder needs Chrome or Edge', 4000); return false; }
+  try {
+    const h = await showDirectoryPicker({ id: 'inkboard-notes', mode: 'readwrite', startIn: 'documents' });
+    FS.dir = h; await DB.put('blobs', h, '__fsroot'); toast('Notes folder: ' + h.name); updateSaveUI(); return true;
+  } catch { return false; }
+}
+function isDirty(nb = S.nb) { return !!nb && (!nb.savedAt || (nb.updated || 0) > nb.savedAt); }
+function updateSaveUI() {
+  const b = $('#btnSave'); if (!b || !S.nb) return;
+  const d = isDirty(), label = !FS.dir ? 'Save to folder…' : d ? 'Save changes' : 'Saved';
+  b.classList.toggle('dirty', !!FS.dir && d);
+  b.innerHTML = icon('save') + label;
+}
+async function writeFile(dir, name, data) { const fh = await dir.getFileHandle(name, { create: true }); const w = await fh.createWritable(); await w.write(data); await w.close(); }
+async function fileExists(dir, name) { try { await dir.getFileHandle(name); return true; } catch { return false; } }
+function blobKeysOf(nb) {
+  const keys = new Set(Object.values(nb.sources || {}).map(s => s.blob));
+  for (const p of nb.pages) { if (p.bg?.image) keys.add(p.bg.image); for (const it of p.items) if (it.t === 'img') keys.add(it.key); }
+  return keys;
+}
+async function uniqueDirName(name, id) {
+  const base = (name || 'Notebook').replace(/[\\/:*?"<>|]+/g, '-').trim().slice(0, 80) || 'Notebook';
+  for (let i = 1; ; i++) {
+    const cand = (i === 1 ? base : `${base} ${i}`) + '.inkboard';
+    try {
+      const d = await FS.dir.getDirectoryHandle(cand);
+      const m = JSON.parse(await (await (await d.getFileHandle('meta.json')).getFile()).text());
+      if (m.id === id) return cand;
+    } catch (e) { if (e.name === 'NotFoundError') return cand; }
+  }
+}
+async function writeNotebook(nb, cover) {
+  if (!nb.file) nb.file = await uniqueDirName(nb.name, nb.id);
+  nb.updated = nb.updated || Date.now(); nb.savedAt = nb.updated;
+  const d = await FS.dir.getDirectoryHandle(nb.file, { create: true }), fd = await d.getDirectoryHandle('files', { create: true });
+  for (const k of blobKeysOf(nb)) { if (await fileExists(fd, k)) continue; const b = await DB.get('blobs', k); if (b) await writeFile(fd, k, b); }
+  const meta = { id: nb.id, name: nb.name, updated: nb.updated, savedAt: nb.savedAt, file: nb.file, pages: nb.pages.length, kind: nb.pages.some(p => p.kind === 'pdf') ? 'pdf' : 'board', cover: cover || null };
+  await writeFile(d, 'notebook.json', JSON.stringify({ format: 'inkboard', v: 2, notebook: nb }));
+  await writeFile(d, 'meta.json', JSON.stringify(meta));
+  await DB.put('notebooks', nb); await DB.put('meta', meta);
+}
+let savingFs = false;
+async function saveChanges() {
+  if (!S.nb || savingFs) return;
+  if (S.editingText) finishText();
+  await saveNow();
+  if (!FS.dir && !(await chooseFolder())) return toast('Autosaved in this browser');
+  if (!(await fsPerm(true))) return toast('Folder access not allowed. Your work is still autosaved in this browser.', 4000);
+  savingFs = true; $('#btnSave').innerHTML = icon('save') + 'Saving…';
+  try { await writeNotebook(S.nb, coverImage()); toast(`Saved to "${FS.dir.name}"`); }
+  catch (e) { console.error(e); toast('Could not save: ' + e.message, 5000); }
+  savingFs = false; updateSaveUI();
+}
+async function saveAll() {
+  if (!(await fsPerm(true))) return;
+  toast('Saving…', 60000); let n = 0;
+  for (const m of HS.metas) {
+    const cur = m.id === S.nb?.id, nb = cur ? S.nb : await DB.get('notebooks', m.id);
+    if (nb && isDirty(nb)) { try { await writeNotebook(nb, cur ? coverImage() : m.cover); n++; } catch (e) { console.error(e); } }
+  }
+  toast(n ? `Saved ${n} notebook${n > 1 ? 's' : ''} to "${FS.dir.name}"` : 'Everything is already saved');
+  updateSaveUI(); await loadHome(); renderHome();
+}
+async function scanFolder() {
+  const out = [];
+  try {
+    for await (const [name, h] of FS.dir.entries()) {
+      if (h.kind !== 'directory' || !name.endsWith('.inkboard')) continue;
+      try { const m = JSON.parse(await (await (await h.getFileHandle('meta.json')).getFile()).text()); out.push({ ...m, dirName: name, dir: h }); } catch {}
+    }
+  } catch (e) { console.warn(e); }
+  return out;
+}
+async function openFromDisk(dir, dirName) {
+  try {
+    toast('Opening…', 8000);
+    const data = JSON.parse(await (await (await dir.getFileHandle('notebook.json')).getFile()).text());
+    if (data.format !== 'inkboard' || !data.notebook) throw new Error('not an Inkboard notebook');
+    const nb = data.notebook;
+    try { const fd = await dir.getDirectoryHandle('files'); for await (const [k, h] of fd.entries()) if (h.kind === 'file' && !(await DB.has('blobs', k))) await DB.put('blobs', await h.getFile(), k); } catch {}
+    nb.file = dirName || null; nb.savedAt = dirName ? nb.updated : 0;
+    await DB.put('notebooks', nb);
+    closeHome();
+    if (S.nb?.id === nb.id) S.nb = null;
+    await openNotebook(nb); await saveNow(); toast('Opened ' + nb.name);
+  } catch (e) { toast('Could not open: ' + e.message, 4000); }
+}
+async function importNotesFolder() {
+  if (!window.showDirectoryPicker) return pickFile('#fileBackup', f => { closeHome(); importBackup(f); });
+  try { const h = await showDirectoryPicker({ id: 'inkboard-import', startIn: 'documents' }); await openFromDisk(h, null); }
+  catch (e) { if (e.name !== 'AbortError') toast('Pick a folder ending in .inkboard', 3500); }
+}
+$('#btnSave').onclick = saveChanges;
+
+/* ================= pen tablet panel (XP-Pen Deco Mini 7) ================= */
+const BTN_ACTS = [['eraser', 'Eraser'], ['pan', 'Pan'], ['laser', 'Laser'], ['select', 'Select'], ['undo', 'Undo'], ['none', 'Nothing']];
+const DECO_KEYS = [['Key 1', 'P', 'Pen'], ['Key 2', 'E', 'Eraser'], ['Key 3', 'H', 'Highlighter'], ['Key 4', 'V', 'Select / move'], ['Key 5', '⌘ Z', 'Undo'], ['Key 6', 'Space (hold)', 'Pan'], ['Key 7', '→', 'Next page'], ['Key 8', 'F', 'Focus mode']];
+function openTablet() {
+  const T = S.tablet, lbl = v => (BTN_ACTS.find(a => a[0] === v) || [, v])[1];
+  const sel = k => `<select data-k="${k}">${BTN_ACTS.map(([v, l]) => `<option value="${v}"${T[k] === v ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  card.innerHTML = `<h2>Pen tablet</h2>
+    <div class="sub">Tuned for the XP-Pen Deco Mini 7: 7 × 4.37 in active area (16:10), two pen buttons, 8 shortcut keys.</div>
+    <div class="tgrid">
+      <div><canvas id="tpad"></canvas><div id="tread" class="tread">Hover or write on the pad to test your pen.</div>
+        <div class="btnrow"><button class="pbtn" data-clear>Clear pad</button><button class="pbtn" data-page>Add a 16:10 page that matches the tablet</button></div></div>
+      <div class="tset">
+        <div class="row"><label>Pressure</label><div class="seg">${[['soft', 'Soft'], ['normal', 'Normal'], ['firm', 'Firm']].map(([v, l]) => `<button data-curve="${v}" class="${T.curve === v ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+        <div class="row"><label>Thinnest line</label><input type="range" min="0" max="0.6" step="0.02" value="${T.min}" data-min><span class="val">${Math.round(T.min * 100)}%</span></div>
+        <div class="row"><label>Lower button</label>${sel('btn2')}</div>
+        <div class="row"><label>Upper button</label>${sel('btn1')}</div>
+        <label class="toggle"><input type="checkbox" data-snap ${T.snap ? 'checked' : ''}> Hold still to snap a stroke into a shape</label>
+        <label class="toggle"><input type="checkbox" data-ring ${T.ring ? 'checked' : ''}> Show a pen-size ring under the cursor</label>
+        <div class="note">Soft gives thick lines with light pressure; Firm needs more force. Pressure only affects pens with "Use pen pressure" on.</div>
+      </div>
+    </div>
+    <h3>Set up the XP-Pen driver once</h3>
+    <ol class="tablet-steps">
+      <li><b>Work Area → Screen:</b> pick your built-in display only (not "All displays") and turn on <b>Proportional</b>, so circles stay round and the pen lands where you expect.</li>
+      <li><b>Pen buttons:</b> set the lower button to <b>Right click</b> and the upper to <b>Middle click</b>. Inkboard turns those into the actions chosen above.</li>
+      <li>Leave the driver's pressure curve straight and tune it here instead.</li>
+      <li>In Inkboard, press <b>F</b> for focus mode. On a 16:10 page, the tablet surface then maps one-to-one onto the page.</li>
+    </ol>
+    <h3>Suggested shortcut keys (driver → Shortcut keys → Keystroke)</h3>
+    <div class="keys">${DECO_KEYS.map(([k, key, a]) => `<div><span>${k} · ${a}</span><span><kbd>${key}</kbd></span></div>`).join('')}</div>`;
+  modal.hidden = false;
+  const pad = card.querySelector('#tpad'), pc = pad.getContext('2d'), read = card.querySelector('#tread');
+  const sizePad = () => { const r = pad.getBoundingClientRect(), d = DPR(); pad.width = Math.round(r.width * d); pad.height = Math.round(r.height * d); pc.setTransform(d, 0, 0, d, 0, 0); pc.fillStyle = '#fff'; pc.fillRect(0, 0, r.width, r.height); pc.fillStyle = '#c3c8d2'; pc.font = '13px ' + FONT; pc.fillText('Write here', 14, 24); };
+  sizePad();
+  let last = null, lastBtn = '';
+  const xy = ev => { const r = pad.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  const show = e => {
+    const raw = e.pressure || 0, cur = e.pointerType === 'pen' ? curvePressure(raw || 0.5) : 0.5;
+    read.innerHTML = (e.pointerType === 'pen' ? `Device: <b>pen</b>` : `Device: <b>${esc(e.pointerType)}</b>${e.pointerType === 'mouse' ? ' (no pressure; if this is your tablet pen, restart the browser after installing the driver)' : ''}`) +
+      ` · pressure ${raw.toFixed(2)} → <b>${cur.toFixed(2)}</b> · tilt ${e.tiltX || 0}°, ${e.tiltY || 0}°` + (lastBtn ? `<br>${lastBtn}` : '');
+  };
+  pad.oncontextmenu = e => e.preventDefault();
+  pad.onpointerdown = e => {
+    e.preventDefault(); pad.setPointerCapture(e.pointerId);
+    const a = buttonAction(e);
+    lastBtn = e.button === 0 && !a ? 'Last press: <b>tip</b> → draws' : `Last press: <b>${e.button === 2 ? 'lower button (right-click)' : e.button === 1 ? 'upper button (middle-click)' : 'eraser end'}</b> → ${lbl(a)}`;
+    last = a ? null : xy(e); show(e);
+  };
+  pad.onpointermove = e => {
+    show(e);
+    if (!last || !(e.buttons & 1)) return;
+    const pr = activePreset(), base = clamp(pr.size, 1, 30);
+    pc.lineCap = 'round'; pc.strokeStyle = pr.kind === 'highlighter' ? '#111' : pr.color;
+    for (const ev of (e.getCoalescedEvents ? e.getCoalescedEvents() : [e])) {
+      const p = xy(ev), w = pr.pressure ? base * (0.3 + 1.4 * pressureOf(ev, pr)) : base;
+      pc.lineWidth = Math.max(0.6, w); pc.beginPath(); pc.moveTo(last[0], last[1]); pc.lineTo(p[0], p[1]); pc.stroke(); last = p;
+    }
+  };
+  pad.onpointerup = pad.onpointercancel = () => { last = null; };
+  card.querySelector('[data-clear]').onclick = sizePad;
+  card.querySelector('[data-page]').onclick = () => { closeModal(); S.pageSize = 'tablet'; savePrefs(); addBlankPage(S.pageIdx, { bg: S.defaultBg, size: 'tablet' }); toast('16:10 page added. Press F for focus mode'); };
+  card.querySelectorAll('[data-curve]').forEach(b => b.onclick = () => { T.curve = b.dataset.curve; card.querySelectorAll('[data-curve]').forEach(x => x.classList.toggle('on', x === b)); savePrefs(); });
+  const mi = card.querySelector('[data-min]'); mi.oninput = () => { T.min = +mi.value; mi.nextElementSibling.textContent = Math.round(T.min * 100) + '%'; savePrefs(); };
+  card.querySelectorAll('select[data-k]').forEach(s => s.onchange = () => { T[s.dataset.k] = s.value; savePrefs(); });
+  card.querySelector('[data-snap]').onchange = e => { T.snap = e.target.checked; savePrefs(); };
+  card.querySelector('[data-ring]').onchange = e => { T.ring = e.target.checked; savePrefs(); invalidate('live'); };
+}
+$('#btnTablet').onclick = openTablet;
+
 /* ================= keyboard ================= */
 window.addEventListener('keydown', e => {
   if (e.target.matches?.('input, textarea')) return;
@@ -1481,7 +1717,7 @@ window.addEventListener('keydown', e => {
     else if (k === '0') { e.preventDefault(); fitPage(); }
     else if (k === '=' || k === '+') { e.preventDefault(); zoomAt(1.25, stage.clientWidth / 2, stage.clientHeight / 2); }
     else if (k === '-') { e.preventDefault(); zoomAt(0.8, stage.clientWidth / 2, stage.clientHeight / 2); }
-    else if (k === 's') { e.preventDefault(); saveNow().then(() => toast('Saved')); }
+    else if (k === 's') { e.preventDefault(); saveChanges(); }
     else if (k === 'o') { e.preventDefault(); openHome(); }
     return;
   }
@@ -1513,7 +1749,7 @@ window.addEventListener('pointermove', e => {
   if (!drag || !near) document.body.classList.toggle('peek', near && !drag);
 });
 window.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; stage.className = 't-' + S.tool; } });
-window.addEventListener('beforeunload', () => { if (S.editingText) finishText(); saveNow(); });
+window.addEventListener('beforeunload', e => { if (S.editingText) finishText(); saveNow(); if (FS.dir && isDirty()) { e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
 
 /* ================= boot ================= */
@@ -1522,10 +1758,11 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) saveN
   renderDock();
   const lastId = LS.get('last', null);
   let nb = lastId && await DB.get('notebooks', lastId).catch(() => null);
-  const first = !nb;
+  FS.dir = await DB.get('blobs', '__fsroot').catch(() => null);
   if (!nb) nb = newNotebook('Untitled board');
   await openNotebook(nb);
-  if (first && (await DB.all('meta').catch(() => [])).length > 1) openHome();
+  openHome();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
   resizeCanvases(); fitPage();
   if (navigator.storage?.persist) navigator.storage.persist();
 })();
