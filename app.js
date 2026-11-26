@@ -66,6 +66,7 @@ const IC = {
   folder: '<path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   // shapes
   s_line: '<path d="M5 19L19 5"/>',
+  s_darrowd: '<path d="M5 19l2.4-2.4M9.8 14.2l2.4-2.4M14.6 9.4L17 7"/><path d="M11 5h8v8"/>',
   s_arrow: '<path d="M5 19L19 5M10 5h9v9"/>',
   s_darrow: '<path d="M5 19L19 5M10 5h9v9M14 19H5v-9"/>',
   s_rect: '<rect x="4" y="6" width="16" height="12" rx="1"/>',
@@ -109,14 +110,14 @@ const STYLES = {
   highlighter: { label: 'Highlighter', thinning: 0, smoothing: 0.75, streamline: 0.62, taper: 0 },
 };
 const DEFAULT_PRESETS = [
-  { id: 'p1', kind: 'pen', style: 'ballpoint', color: '#111111', size: 3, opacity: 1, pressure: true },
-  { id: 'p2', kind: 'pen', style: 'fountain', color: '#1e5eff', size: 4, opacity: 1, pressure: true },
-  { id: 'p3', kind: 'pen', style: 'ballpoint', color: '#e5302f', size: 3, opacity: 1, pressure: true },
-  { id: 'p4', kind: 'pen', style: 'marker', color: '#12a150', size: 5, opacity: 1, pressure: false },
-  { id: 'p5', kind: 'pen', style: 'brush', color: '#ffffff', size: 6, opacity: 1, pressure: true },
-  { id: 'h1', kind: 'highlighter', style: 'highlighter', color: '#ffe14d', size: 24, opacity: 0.6, pressure: false },
-  { id: 'h2', kind: 'highlighter', style: 'highlighter', color: '#7cf29b', size: 24, opacity: 0.6, pressure: false },
-  { id: 'h3', kind: 'highlighter', style: 'highlighter', color: '#ff8fd1', size: 24, opacity: 0.6, pressure: false },
+  { id: 'p1', kind: 'pen', style: 'ballpoint', color: '#111111', size: 2, opacity: 1, pressure: false },
+  { id: 'p2', kind: 'pen', style: 'ballpoint', color: '#1e5eff', size: 2, opacity: 1, pressure: false },
+  { id: 'p3', kind: 'pen', style: 'ballpoint', color: '#e5302f', size: 2, opacity: 1, pressure: false },
+  { id: 'p4', kind: 'pen', style: 'ballpoint', color: '#12a150', size: 2, opacity: 1, pressure: false },
+  { id: 'p5', kind: 'pen', style: 'ballpoint', color: '#ff8c00', size: 2, opacity: 1, pressure: false },
+  { id: 'h1', kind: 'highlighter', style: 'highlighter', color: '#ffe14d', size: 22, opacity: 0.55, pressure: false },
+  { id: 'h2', kind: 'highlighter', style: 'highlighter', color: '#7cf29b', size: 22, opacity: 0.55, pressure: false },
+  { id: 'l1', kind: 'laser', style: 'laser', color: '#ff2d2d', size: 1, opacity: 1, pressure: false },
 ];
 const PALETTE = ['#000000', '#3c3c3c', '#7a7a7a', '#bdbdbd', '#ffffff', '#e5302f', '#ff6b35', '#ffb000', '#ffe14d', '#c6f432',
   '#12a150', '#1fd1a5', '#00b8d9', '#1e5eff', '#3b2ccf', '#8e44ff', '#d63ad6', '#ff4fa3', '#8b5a2b', '#0b3d2e'];
@@ -141,8 +142,8 @@ const LS = {
 const S = {
   nb: null, pageIdx: 0,
   tool: 'ink',
-  presets: LS.get('presets', DEFAULT_PRESETS),
-  activePreset: LS.get('activePreset', 'p1'),
+  presets: LS.get('presetsVer', 0) >= 2 ? LS.get('presets', DEFAULT_PRESETS) : DEFAULT_PRESETS.map(p => ({ ...p })),
+  activePreset: LS.get('presetsVer', 0) >= 2 ? LS.get('activePreset', 'p1') : 'p1',
   lastPen: LS.get('lastPen', 'p1'), lastHl: LS.get('lastHl', 'h1'),
   shape: LS.get('shape', { kind: 'arrow', color: '#e5302f', size: 4, dash: false, fill: false }),
   text: LS.get('text', { color: '#111111', fs: 36 }),
@@ -162,7 +163,7 @@ const S = {
   hover: null, laser: [], editingText: null, hiddenId: null, present: false,
 };
 const activePreset = () => S.presets.find(p => p.id === S.activePreset) || S.presets[0];
-const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); LS.set('tablet', S.tablet); LS.set('laser', S.laserCfg); LS.set('penBar', S.penBar); LS.set('tabletKeys', S.tabletKeys); LS.set('sym', S.sym); };
+const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); LS.set('tablet', S.tablet); LS.set('laser', S.laserCfg); LS.set('penBar', S.penBar); LS.set('tabletKeys', S.tabletKeys); LS.set('sym', S.sym); LS.set('presetsVer', 2); };
 const curPage = () => S.nb.pages[S.pageIdx];
 
 /* ================= geometry: items → drawable ops ================= */
@@ -218,6 +219,19 @@ function shapeOps(s) {
   }
   return ops;
 }
+// On dark boards, near-black / grey ink is drawn light so it stays visible (stored colours never change).
+let DARK = false;
+const fixCache = new Map();
+function fixC(c) {
+  if (c === '#fffffe') return DARK ? '#1b1e24' : '#ffffff';
+  if (!DARK || typeof c !== 'string' || c[0] !== '#') return c;
+  let r = fixCache.get(c); if (r) return r;
+  const [R, G, B] = hexToRgb(c), mx = Math.max(R, G, B), mn = Math.min(R, G, B), L = (0.299 * R + 0.587 * G + 0.114 * B) / 255, sat = mx ? (mx - mn) / mx : 0, hx = v => Math.round(v).toString(16).padStart(2, '0');
+  if (L < 0.5 && sat < 0.3) { const v = 255 * (0.95 - L * 0.55); r = '#' + hx(v) + hx(v) + hx(Math.min(255, v + 4)); }
+  else if (L < 0.25) r = '#' + [R, G, B].map(v => hx(v + (255 - v) * 0.5)).join('');
+  else r = c;
+  fixCache.set(c, r); return r;
+}
 const opsCache = new WeakMap();
 function computeOps(it, live = false) {
   if (it.t === 'ink') return [{ d: svgFromOutline(getStroke(it.pts, inkOptions(it, !live))), fill: it.color, fillAlpha: it.opacity }];
@@ -230,12 +244,12 @@ function itemOps(it) { let o = opsCache.get(it); if (!o) { o = computeOps(it); o
 function drawOps(ctx, ops, mul = 1) {
   for (const op of ops) {
     if (op.text != null) {
-      ctx.globalAlpha = (op.alpha ?? 1) * mul; ctx.fillStyle = op.fill; ctx.font = `${op.bold ? '600 ' : ''}${op.fs}px ${FONT}`;
+      ctx.globalAlpha = (op.alpha ?? 1) * mul; ctx.fillStyle = fixC(op.fill); ctx.font = `${op.bold ? '600 ' : ''}${op.fs}px ${FONT}`;
       ctx.textAlign = op.align || 'center'; ctx.textBaseline = 'middle'; ctx.fillText(op.text, op.x, op.y); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; continue;
     }
     const p = op._p || (op._p = new Path2D(op.d));
-    if (op.fill) { ctx.globalAlpha = (op.fillAlpha ?? 1) * mul; ctx.fillStyle = op.fill; ctx.fill(p); }
-    if (op.stroke) { ctx.globalAlpha = (op.alpha ?? 1) * mul; ctx.strokeStyle = op.stroke; ctx.lineWidth = op.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash(op.dash || []); ctx.stroke(p); }
+    if (op.fill) { ctx.globalAlpha = (op.fillAlpha ?? 1) * mul; ctx.fillStyle = fixC(op.fill); ctx.fill(p); }
+    if (op.stroke) { ctx.globalAlpha = (op.alpha ?? 1) * mul; ctx.strokeStyle = fixC(op.stroke); ctx.lineWidth = op.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.setLineDash(op.dash || []); ctx.stroke(p); }
   }
   ctx.globalAlpha = 1; ctx.setLineDash([]);
 }
@@ -251,7 +265,7 @@ function measureText(text, fs) {
 }
 function drawItem(ctx, it) {
   if (it.t === 'text') {
-    ctx.fillStyle = it.color; ctx.font = `${it.fs}px ${FONT}`; ctx.textBaseline = 'top';
+    ctx.fillStyle = fixC(it.color); ctx.font = `${it.fs}px ${FONT}`; ctx.textBaseline = 'top';
     textLines(it).forEach((l, i) => ctx.fillText(l, it.x, it.y + i * it.fs * 1.25 + it.fs * 0.1));
   } else if (it.t === 'img') {
     const im = getImage(it.key); if (im) ctx.drawImage(im, it.x, it.y, it.w, it.h);
@@ -450,7 +464,7 @@ function drawBg() {
   C.hl.style.mixBlendMode = isDarkPage(p) ? 'screen' : 'multiply';
 }
 function drawInk() {
-  const p = curPage(), hl = X.hl, ink = X.ink;
+  const p = curPage(), hl = X.hl, ink = X.ink; DARK = isDarkPage(p);
   for (const c of [hl, ink]) { clearCtx(c); setView(c); c.save(); c.beginPath(); c.rect(0, 0, p.w, p.h); c.clip(); }
   const v = S.view, st = stage, vx0 = -v.x / v.scale, vy0 = -v.y / v.scale, vx1 = vx0 + st.clientWidth / v.scale, vy1 = vy0 + st.clientHeight / v.scale;
   const items = p.items;
@@ -460,6 +474,7 @@ function drawInk() {
   hl.restore(); ink.restore();
 }
 function drawLive() {
+  DARK = isDarkPage(curPage());
   const ctx = X.live; clearCtx(ctx); setView(ctx);
   const sc = S.view.scale;
   drawGuide(ctx, sc);
@@ -881,7 +896,7 @@ function startText(x, y, existing) {
   const fs = existing ? existing.fs : S.text.fs, color = existing ? existing.color : S.text.color;
   S.editingText = { ta, x, y, fs, color, existing, fresh: !existing };
   if (existing) { ta.value = existing.text; S.hiddenId = existing.id; invalidate('ink'); }
-  ta.style.color = color;
+  ta.style.color = (DARK = isDarkPage(curPage()), fixC(color));
   stage.appendChild(ta); positionTextEditor();
   ta.addEventListener('input', positionTextEditor);
   ta.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); finishText(); } });
@@ -891,7 +906,7 @@ function startText(x, y, existing) {
 function positionTextEditor() {
   const t = S.editingText; if (!t) return; const v = S.view, ta = t.ta;
   ta.style.left = v.x + t.x * v.scale + 'px'; ta.style.top = v.y + t.y * v.scale + 'px';
-  ta.style.fontSize = t.fs * v.scale + 'px'; ta.style.color = t.color;
+  ta.style.fontSize = t.fs * v.scale + 'px'; DARK = isDarkPage(curPage()); ta.style.color = fixC(t.color);
   const m = measureText(ta.value || 'M', t.fs);
   ta.style.width = (m.w + t.fs) * v.scale + 'px'; ta.style.height = (m.h + t.fs * 0.3) * v.scale + 'px';
 }
@@ -981,7 +996,7 @@ async function renderThumb(i) {
     if (!t) { t = await renderPdfToCanvas(p, Math.min(s * 1.5, 1)); thumbPdf.set(pdfKey(p), t); if (thumbPdf.size > 400) thumbPdf.delete(thumbPdf.keys().next().value); }
     ctx.drawImage(t, 0, 0, p.w, p.h);
   } else drawBoardBg(ctx, p, 1 / s);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, p.w, p.h); ctx.clip();
+  DARK = isDarkPage(p); ctx.save(); ctx.beginPath(); ctx.rect(0, 0, p.w, p.h); ctx.clip();
   for (const it of p.items) if (it.t === 'img') drawItem(ctx, it);
   for (const it of p.items) if (it.t !== 'img') { if (it.hl) ctx.globalCompositeOperation = isDarkPage(p) ? 'screen' : 'multiply'; drawItem(ctx, it); ctx.globalCompositeOperation = 'source-over'; }
   ctx.restore();
@@ -998,6 +1013,7 @@ const thumbDirtyAll = debounce(() => { thumbsEl.querySelectorAll('.thumb').forEa
 const dock = $('#dock');
 function nibSVG(p) {
   const c = p.color, edge = lum(c) > 0.82 ? 'rgba(0,0,0,.38)' : 'rgba(0,0,0,.18)';
+  if (p.kind === 'laser') return `<svg viewBox="0 0 26 52"><circle cx="13" cy="7" r="6" fill="${c}" opacity=".28"/><circle cx="13" cy="7" r="3" fill="${c}"/><rect x="8" y="14" width="10" height="38" rx="3" fill="#3a3f48"/><rect x="8" y="14" width="3.5" height="38" rx="2" fill="rgba(255,255,255,.12)"/><rect x="8" y="14" width="10" height="4" fill="#9aa1ad"/><circle cx="13" cy="28" r="2.2" fill="${c}"/></svg>`;
   if (p.kind === 'highlighter') return `<svg viewBox="0 0 26 52"><rect x="5" y="20" width="16" height="32" rx="3" fill="#2f343c"/><rect x="5" y="20" width="5" height="32" rx="2" fill="rgba(255,255,255,.09)"/><rect x="5" y="20" width="16" height="7" fill="${c}"/><path d="M7 20 L8 9 L19 5.5 L19 20Z" fill="${c}" stroke="${edge}" stroke-width=".7"/><path d="M8 9 L19 5.5 L19 8 L8.3 11.4Z" fill="rgba(255,255,255,.38)"/></svg>`;
   const tips = {
     ballpoint: `<path d="M7 20 L13 5 L19 20Z" fill="#d7dae0"/><path d="M7 20 L13 5 L13 20Z" fill="rgba(255,255,255,.55)"/><path d="M11.4 9 L13 5 L14.6 9Z" fill="${c}"/>`,
@@ -1009,7 +1025,7 @@ function nibSVG(p) {
 }
 function penButtons(t) {
   return S.presets.map((p, i) => {
-    const on = t === 'ink' && p.id === S.activePreset, title = esc((p.kind === 'highlighter' ? 'Highlighter' : (STYLES[p.style]?.label || 'Pen')) + ' · ' + p.size + 'px' + (i < 9 ? ' (' + (i + 1) + ')' : '')) + ' — click again to edit';
+    const on = (t === 'ink' && p.id === S.activePreset) || (t === 'laser' && p.kind === 'laser'), title = esc((p.kind === 'laser' ? 'Laser pointer' : p.kind === 'highlighter' ? 'Highlighter' : (STYLES[p.style]?.label || 'Pen')) + ' · ' + p.size + 'px' + (i < 9 ? ' (' + (i + 1) + ')' : '')) + ' — click again to edit';
     if (S.penBar === 'dots') { const hl = p.kind === 'highlighter', d = clamp(7 + p.size * 1.6, 8, 24); return `<button class="pslot${on ? ' on' : ''}" data-preset="${p.id}" title="${title}"><i style="background:${p.color};width:${hl ? 24 : d}px;height:${hl ? Math.min(10, d) : d}px;border-radius:${hl ? 3 : 99}px;opacity:${hl ? Math.max(0.55, p.opacity) : p.opacity}"></i></button>`; }
     return `<button class="nib${on ? ' on' : ''}" data-preset="${p.id}" title="${title}">${nibSVG(p)}</button>`;
   }).join('');
@@ -1031,10 +1047,12 @@ function renderDock() {
     penButtons(t) +
     `<button class="addpen" data-act="addpen" title="Save a new pen">${icon('plus')}</button>` +
     '<div class="sep"></div>' +
+    [['line', 's_line', 'Straight line in your pen colour', false], ['arrow', 's_arrow', 'Arrow in your pen colour', false], ['darrowd', 's_darrowd', 'Dashed arrow in your pen colour', true]].map(([q, ic, tt, dash]) => `<button class="tool qs${t === 'shape' && S.shape.kind === (q === 'darrowd' ? 'arrow' : q) && !!S.shape.dash === dash ? ' on' : ''}" data-qs="${q}" title="${tt}" style="color:${lum(penColor()) < 0.3 ? '#e9ebf0' : penColor()}">${icon(ic)}</button>`).join('') +
+    '<div class="sep"></div>' +
     b('eraser', 'eraser', 'Eraser (E) — click again for options', '<span class="caret"></span>') +
     b('shape', 's_' + S.shape.kind, 'Shapes & arrows (A/R/O/I) — click again for options', '<span class="caret"></span>') +
     `<button class="tool${t === 'sym' ? ' on' : ''}" data-act="phys" title="Shapes & physics library (K)">${icon('atom')}</button>` +
-    b('text', 'text', 'Text (T)') + b('laser', 'laser', 'Laser pointer (L) — click again for modes & colours', '<span class="caret"></span>') +
+    b('text', 'text', 'Text (T)') +
     `<button class="tool${S.guide ? ' on' : ''}" data-act="guide" title="Ruler & protractor (G)">${icon('ruler')}<span class="caret"></span></button>` +
     '<div class="sep"></div>' +
     QUICK.map(c => `<button class="sw${cc && cc.toLowerCase() === c ? ' on' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('') +
@@ -1052,9 +1070,12 @@ dock.addEventListener('click', e => {
     if (S.tool === tl && ['eraser', 'shape', 'text', 'laser'].includes(tl)) return openToolPopover(tl, el);
     setTool(tl);
   } else if (el.dataset.preset) {
+    const pp = S.presets.find(p => p.id === el.dataset.preset);
+    if (pp?.kind === 'laser' && S.tool === 'laser') return openToolPopover('laser', el);
     if (S.tool === 'ink' && S.activePreset === el.dataset.preset) return openPenPopover(el);
     selectPreset(el.dataset.preset);
-  } else if (el.dataset.color) applyColor(el.dataset.color);
+  } else if (el.dataset.qs) quickShape(el.dataset.qs);
+  else if (el.dataset.color) applyColor(el.dataset.color);
   else if (el.dataset.size) applySize(+el.dataset.size);
   else if (el.dataset.act === 'colors') openColorPopover(el);
   else if (el.dataset.act === 'addpen') { const p = { ...activePreset(), id: uid() }; S.presets.push(p); S.activePreset = p.id; S.tool = 'ink'; savePrefs(); renderDock(); openPenPopover(dock.querySelector(`[data-preset="${p.id}"]`)); toast('New pen added'); }
@@ -1071,7 +1092,17 @@ function setTool(t) {
   renderDock(); invalidate('live');
   if (!lib.hidden) renderLib();
 }
-function selectPreset(id) { S.activePreset = id; S.tool = 'ink'; const p = activePreset(); if (p.kind === 'highlighter') S.lastHl = id; else S.lastPen = id; savePrefs(); setTool('ink'); }
+function selectPreset(id) {
+  S.activePreset = id; const p = activePreset();
+  if (p.kind === 'laser') { S.laserCfg.color = p.color; savePrefs(); return setTool('laser'); }
+  if (p.kind === 'highlighter') S.lastHl = id; else S.lastPen = id;
+  savePrefs(); setTool('ink');
+}
+function penColor() { return (S.presets.find(p => p.id === S.lastPen && p.kind === 'pen') || S.presets.find(p => p.kind === 'pen') || {}).color || '#111111'; }
+function quickShape(q) {
+  const [kind, dash] = q === 'darrowd' ? ['arrow', true] : [q, false], pen = S.presets.find(p => p.id === S.lastPen && p.kind === 'pen');
+  Object.assign(S.shape, { kind, dash, color: penColor(), size: Math.max(2, (pen?.size || 2) * 1.15) }); savePrefs(); setTool('shape');
+}
 function pushRecent(c) { c = c.toLowerCase(); if (PALETTE.includes(c) || QUICK.includes(c)) return; S.recent = [c, ...S.recent.filter(x => x !== c)].slice(0, 10); }
 function applyColor(c) {
   if (S.sel.size) { recolorSel(c); return; }
@@ -1382,6 +1413,7 @@ async function renderPageImage(p, scale) {
   const cv = document.createElement('canvas'); cv.width = Math.round(p.w * scale); cv.height = Math.round(p.h * scale);
   const ctx = cv.getContext('2d'); ctx.setTransform(scale, 0, 0, scale, 0, 0);
   if (p.kind === 'pdf') ctx.drawImage(await renderPdfToCanvas(p, scale), 0, 0, p.w, p.h); else drawBoardBg(ctx, p, 1 / scale);
+  DARK = isDarkPage(p);
   for (const it of p.items) if (it.t === 'img') drawItem(ctx, it);
   for (const it of p.items) if (it.t !== 'img') { if (it.hl) ctx.globalCompositeOperation = isDarkPage(p) ? 'screen' : 'multiply'; drawItem(ctx, it); ctx.globalCompositeOperation = 'source-over'; }
   return cv;
@@ -1428,24 +1460,25 @@ async function exportPdf(onlyAnnotated) {
         const png = await out.embedPng(await (await new Promise(r => cv.toBlob(r, 'image/png'))).arrayBuffer());
         pg.drawImage(png, { x: 0, y: 0, width: p.w, height: p.h });
       }
+      DARK = isDarkPage(p);
       const order = [...p.items.filter(i => i.t === 'img'), ...p.items.filter(i => i.t !== 'img' && i.hl), ...p.items.filter(i => i.t !== 'img' && !i.hl)];
       for (const it of order) {
         if (it.t === 'img') { const im = await embedImg(it.key); if (im) pg.drawImage(im, { x: ox + it.x * s, y: oy - (it.y + it.h) * s, width: it.w * s, height: it.h * s }); continue; }
         if (it.t === 'text') {
-          textLines(it).forEach((line, i) => { try { pg.drawText(line, { x: ox + it.x * s, y: oy - (it.y + i * it.fs * 1.25 + it.fs * 0.92) * s, size: it.fs * s, font, color: col(it.color) }); } catch (e) { console.warn('text', e); } });
+          textLines(it).forEach((line, i) => { try { pg.drawText(line, { x: ox + it.x * s, y: oy - (it.y + i * it.fs * 1.25 + it.fs * 0.92) * s, size: it.fs * s, font, color: col(fixC(it.color)) }); } catch (e) { console.warn('text', e); } });
           continue;
         }
         for (const op of itemOps(it)) {
           if (op.text != null) {
             const t = pdfSafe(op.text), fz = op.fs * s, fnt = op.bold ? fontB : font; let tw = 0; try { tw = fnt.widthOfTextAtSize(t, fz); } catch {}
             const ax = op.align === 'left' ? 0 : op.align === 'right' ? tw : tw / 2;
-            try { pg.drawText(t, { x: ox + op.x * s - ax, y: oy - (op.y + op.fs * 0.35) * s, size: fz, font: fnt, color: col(op.fill), opacity: op.alpha ?? 1 }); } catch (e) { console.warn('text', e); }
+            try { pg.drawText(t, { x: ox + op.x * s - ax, y: oy - (op.y + op.fs * 0.35) * s, size: fz, font: fnt, color: col(fixC(op.fill)), opacity: op.alpha ?? 1 }); } catch (e) { console.warn('text', e); }
             continue;
           }
           const o = { x: ox, y: oy, scale: s };
           if (it.hl) o.blendMode = isDarkPage(p) ? BlendMode.Screen : BlendMode.Multiply;
-          if (op.fill) { o.color = col(op.fill); o.opacity = op.fillAlpha ?? 1; }
-          if (op.stroke) { o.borderColor = col(op.stroke); o.borderWidth = op.width; o.borderOpacity = op.alpha ?? 1; o.borderLineCap = LineCapStyle.Round; if (op.dash) o.borderDashArray = op.dash; }
+          if (op.fill) { o.color = col(fixC(op.fill)); o.opacity = op.fillAlpha ?? 1; }
+          if (op.stroke) { o.borderColor = col(fixC(op.stroke)); o.borderWidth = op.width; o.borderOpacity = op.alpha ?? 1; o.borderLineCap = LineCapStyle.Round; if (op.dash) o.borderDashArray = op.dash; }
           pg.drawSvgPath(op.d, o);
         }
       }
@@ -2066,7 +2099,7 @@ function renderLib(keepFocus) {
   lib.querySelectorAll('.lib-it').forEach(b => {
     const k = b.dataset.k, d = SYMS[k], cv = b.querySelector('canvas'), ctx = cv.getContext('2d'), pad = 14;
     const s = Math.min((cv.width - pad * 2) / d.w, (cv.height - pad * 2) / d.h);
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    DARK = false; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.setTransform(s, 0, 0, s, (cv.width - d.w * s) / 2, (cv.height - d.h * s) / 2);
     drawOps(ctx, symOps({ t: 'sym', kind: k, x: 0, y: 0, w: d.w, h: d.h, color: S.sym.color, nat: S.sym.nat, size: clamp(2.4 / s, 1.2, 7) }));
     b.onclick = () => { S.sym.kind = k; savePrefs(); setTool('sym'); renderLib(); };
@@ -2193,7 +2226,8 @@ window.addEventListener('keydown', e => {
     case 'home': gotoPage(0); break; case 'end': gotoPage(S.nb.pages.length - 1); break;
     case 'p': selectPreset(S.presets.find(p => p.id === S.lastPen && p.kind === 'pen')?.id || S.presets.find(p => p.kind === 'pen')?.id || S.presets[0].id); break;
     case 'h': { const h = S.presets.find(p => p.id === S.lastHl && p.kind === 'highlighter') || S.presets.find(p => p.kind === 'highlighter'); if (h) selectPreset(h.id); break; }
-    case 'e': setTool('eraser'); break; case 'v': setTool('select'); break; case 't': setTool('text'); break; case 'l': setTool('laser'); break;
+    case 'e': setTool('eraser'); break; case 'v': setTool('select'); break; case 't': setTool('text'); break;
+    case 'l': { const lp = S.presets.find(p => p.kind === 'laser'); if (lp) selectPreset(lp.id); else setTool('laser'); break; }
     case 'a': S.shape.kind = 'arrow'; savePrefs(); setTool('shape'); break;
     case 'r': S.shape.kind = 'rect'; savePrefs(); setTool('shape'); break;
     case 'o': S.shape.kind = 'ellipse'; savePrefs(); setTool('shape'); break;

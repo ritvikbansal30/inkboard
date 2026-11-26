@@ -3,6 +3,7 @@
 const r2 = n => Math.round(n * 100) / 100;
 const PI = Math.PI;
 const INK = '#111111';
+const PAPER = '#fffffe';   // 'paper' fill: white on light boards, board-coloured on dark ones
 const shade = hex => { const n = parseInt(hex.slice(1), 16), f = v => Math.round(v * 0.72); return '#' + [f((n >> 16) & 255), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); };
 
 function builder(it) {
@@ -46,7 +47,7 @@ function builder(it) {
 // helpers
 function particle(g, x, y, r, col, sign, outline) {
   g.circle(x, y, r);
-  if (outline) g.fill('#ffffff', 1, col, Math.max(0.6, r / 22)); else g.fill(col, 1, shade(col), 0.5);
+  if (outline) g.fill(PAPER, 1, col, Math.max(0.6, r / 22)); else g.fill(col, 1, shade(col), 0.5);
   const k = r * 0.48, c = outline ? col : '#ffffff', wk = Math.min(2.2, Math.max(0.6, r / 15));
   if (sign) { g.line(x - k, y, x + k, y); if (sign === '+') g.line(x, y - k, x, y + k); g.stroke(c, wk); }
 }
@@ -95,7 +96,7 @@ export const SYMS = {
   neutron: { ch: 'modern', name: 'Neutron', w: 44, h: 44, lock: 1, kw: 'n nucleon neutral', draw: (g, w, h, C) => particle(g, w / 2, h / 2, Math.min(w, h) / 2 - 1, C('#8a8f98')) },
   electron: { ch: 'modern', name: 'Electron', w: 30, h: 30, lock: 1, kw: 'e minus negative beta', draw: (g, w, h, C) => particle(g, w / 2, h / 2, Math.min(w, h) / 2 - 1, C('#1e5eff'), '-') },
   positron: { ch: 'modern', name: 'Positron', w: 30, h: 30, lock: 1, kw: 'e+ antielectron beta plus', draw: (g, w, h, C) => particle(g, w / 2, h / 2, Math.min(w, h) / 2 - 1, C('#0aa5a5'), '+') },
-  neutrino: { ch: 'modern', name: 'Neutrino', w: 30, h: 30, lock: 1, kw: 'nu antineutrino', draw: (g, w, h, C) => { const c = C('#7a4dff'); g.circle(w / 2, h / 2, Math.min(w, h) / 2 - 1).fill('#ffffff', 1, c, 0.7); g.text(w / 2, h / 2, 'ν', h * 0.6, c); } },
+  neutrino: { ch: 'modern', name: 'Neutrino', w: 30, h: 30, lock: 1, kw: 'nu antineutrino', draw: (g, w, h, C) => { const c = C('#7a4dff'); g.circle(w / 2, h / 2, Math.min(w, h) / 2 - 1).fill(PAPER, 1, c, 0.7); g.text(w / 2, h / 2, 'ν', h * 0.6, c); } },
   photon: { ch: 'modern', name: 'Photon (hν)', w: 150, h: 46, kw: 'light quantum wave', draw: (g, w, h, C) => { const c = C('#e69500'); g.wave(0, h * 0.64, w - 14, h * 0.64, 4.5, h * 0.18).stroke(c, 0.9); g.head(w - 20, h * 0.64, w, h * 0.64, c, Math.min(14, h * 0.4)); g.text(w * 0.45, h * 0.15, 'hν', h * 0.32, c); } },
   gamma: { ch: 'modern', name: 'Gamma ray (γ)', w: 150, h: 46, kw: 'radiation photon', draw: (g, w, h, C) => { const c = C('#8e44ff'); g.wave(0, h * 0.64, w - 14, h * 0.64, 7, h * 0.16).stroke(c, 0.9); g.head(w - 20, h * 0.64, w, h * 0.64, c, Math.min(14, h * 0.4)); g.text(w * 0.45, h * 0.15, 'γ', h * 0.36, c); } },
   alpha: { ch: 'modern', name: 'Alpha particle', w: 64, h: 64, lock: 1, kw: 'helium nucleus 2p2n', draw: (g, w, h, C) => cluster(g, w / 2, h / 2, w * 0.24, ['n', 'p', 'p', 'n'], C) },
@@ -131,7 +132,7 @@ export const SYMS = {
     g.arrow(w * 0.42, h * 0.43, w * 0.58, h * 0.43, C('#1e5eff'), 0.5, 7);
     g.poly([[w * 0.2125, h * 0.52], [w * 0.2125, h * 0.88], [w * 0.4, h * 0.88]]).line(w * 0.47, h * 0.88, w * 0.565, h * 0.88).poly([[w * 0.675, h * 0.88], [w * 0.7875, h * 0.88], [w * 0.7875, h * 0.52]]).stroke(ink, 0.7);
     g.line(w * 0.4, h * 0.79, w * 0.4, h * 0.97).stroke(ink, 0.8).line(w * 0.47, h * 0.83, w * 0.47, h * 0.93).stroke(ink, 1.8); g.line(w * 0.4, h * 0.88, w * 0.47, h * 0.88).stroke(ink, 0.7, { dash: 1 });
-    g.circle(w * 0.62, h * 0.88, h * 0.055).fill('#ffffff', 1, ink, 0.7); g.text(w * 0.62, h * 0.88, 'μA', h * 0.05, ink);
+    g.circle(w * 0.62, h * 0.88, h * 0.055).fill(PAPER, 1, ink, 0.7); g.text(w * 0.62, h * 0.88, 'μA', h * 0.05, ink);
   } },
   kgraph: { ch: 'modern', name: 'Kmax vs ν graph', w: 250, h: 190, kw: 'photoelectric threshold frequency work function einstein equation', draw: (g, w, h, C, c) => {
     const ink = C(INK), ox = w * 0.16, oy = h * 0.82; axes(g, ox, oy, w * 0.97, h * 0.04, ink, 'ν', 'Kₘₐₓ', 13);
@@ -182,7 +183,7 @@ export const SYMS = {
     const ink = C(INK); particle(g, w * 0.07, h * 0.58, h * 0.16, C('#8a8f98')); g.arrow(w * 0.15, h * 0.58, w * 0.3, h * 0.58, ink, 0.8, 9);
     particle(g, w * 0.39, h * 0.58, h * 0.16, C('#e5302f'), '+'); g.text(w * 0.5, h * 0.58, '+', h * 0.22, ink);
     particle(g, w * 0.6, h * 0.58, h * 0.11, C('#1e5eff'), '-'); g.text(w * 0.7, h * 0.58, '+', h * 0.22, ink);
-    const nc = C('#7a4dff'); g.circle(w * 0.8, h * 0.58, h * 0.11).fill('#ffffff', 1, nc, 0.7); g.text(w * 0.8, h * 0.58, 'ν̄', h * 0.14, nc);
+    const nc = C('#7a4dff'); g.circle(w * 0.8, h * 0.58, h * 0.11).fill(PAPER, 1, nc, 0.7); g.text(w * 0.8, h * 0.58, 'ν̄', h * 0.14, nc);
     ['n', 'p', 'e⁻', 'ν̄'].forEach((s, i) => g.text(w * [0.07, 0.39, 0.6, 0.8][i], h * 0.13, s, h * 0.13, ink));
   } },
   rutherford: { ch: 'modern', name: 'Rutherford scattering', w: 290, h: 210, kw: 'alpha gold foil nucleus impact parameter deflection', draw: (g, w, h, C) => {
@@ -246,7 +247,7 @@ export const SYMS = {
   resistor: { ch: 'circuit', name: 'Resistor', w: 140, h: 40, kw: 'resistance R zigzag', draw: (g, w, h, C, c) => g.zig(0, h / 2, w, h / 2, 6, h * 0.32, 0.22).stroke(c) },
   cell: { ch: 'circuit', name: 'Cell', w: 120, h: 50, kw: 'battery emf', draw: (g, w, h, C, c) => { g.line(0, h / 2, w * 0.45, h / 2).line(w * 0.55, h / 2, w, h / 2).line(w * 0.45, h * 0.08, w * 0.45, h * 0.92).stroke(c); g.line(w * 0.55, h * 0.3, w * 0.55, h * 0.7).stroke(c, 2.2); } },
   battery: { ch: 'circuit', name: 'Battery', w: 150, h: 50, kw: 'cells emf', draw: (g, w, h, C, c) => { g.line(0, h / 2, w * 0.36, h / 2).line(w * 0.64, h / 2, w, h / 2).line(w * 0.36, h * 0.08, w * 0.36, h * 0.92).line(w * 0.56, h * 0.08, w * 0.56, h * 0.92).stroke(c); g.line(w * 0.44, h * 0.3, w * 0.44, h * 0.7).line(w * 0.64, h * 0.3, w * 0.64, h * 0.7).stroke(c, 2.2); g.line(w * 0.44, h / 2, w * 0.56, h / 2).stroke(c, 0.7, { dash: 1 }); } },
-  switch: { ch: 'circuit', name: 'Switch (key)', w: 130, h: 50, kw: 'key open', draw: (g, w, h, C, c) => { g.line(0, h * 0.7, w * 0.3, h * 0.7).line(w * 0.7, h * 0.7, w, h * 0.7).line(w * 0.3, h * 0.7, w * 0.66, h * 0.12).stroke(c); g.circle(w * 0.3, h * 0.7, 4).fill('#ffffff', 1, c).circle(w * 0.7, h * 0.7, 4).fill('#ffffff', 1, c); } },
+  switch: { ch: 'circuit', name: 'Switch (key)', w: 130, h: 50, kw: 'key open', draw: (g, w, h, C, c) => { g.line(0, h * 0.7, w * 0.3, h * 0.7).line(w * 0.7, h * 0.7, w, h * 0.7).line(w * 0.3, h * 0.7, w * 0.66, h * 0.12).stroke(c); g.circle(w * 0.3, h * 0.7, 4).fill(PAPER, 1, c).circle(w * 0.7, h * 0.7, 4).fill(PAPER, 1, c); } },
   bulb: { ch: 'circuit', name: 'Bulb', w: 120, h: 50, kw: 'lamp', draw: (g, w, h, C, c) => { const r = h * 0.4, x = w / 2, y = h / 2, k = r * 0.7; g.line(0, y, x - r, y).line(x + r, y, w, y).circle(x, y, r).line(x - k, y - k, x + k, y + k).line(x - k, y + k, x + k, y - k).stroke(c); } },
   ammeter: { ch: 'circuit', name: 'Ammeter', w: 120, h: 50, kw: 'A meter current', draw: (g, w, h, C, c) => { const r = h * 0.42; g.line(0, h / 2, w / 2 - r, h / 2).line(w / 2 + r, h / 2, w, h / 2).circle(w / 2, h / 2, r).stroke(c); g.text(w / 2, h / 2, 'A', h * 0.45, c, { bold: 1 }); } },
   voltmeter: { ch: 'circuit', name: 'Voltmeter', w: 120, h: 50, kw: 'V meter potential', draw: (g, w, h, C, c) => { const r = h * 0.42; g.line(0, h / 2, w / 2 - r, h / 2).line(w / 2 + r, h / 2, w, h / 2).circle(w / 2, h / 2, r).stroke(c); g.text(w / 2, h / 2, 'V', h * 0.45, c, { bold: 1 }); } },
@@ -286,7 +287,7 @@ export const SYMS = {
   pnjunction: { ch: 'semi', name: 'p-n junction (depletion)', w: 220, h: 110, kw: 'holes electrons depletion region barrier', draw: (g, w, h, C, c) => {
     g.rect(0, h * 0.15, w * 0.44, h * 0.8).fill(C('#ffd6d6'), 0.8).rect(w * 0.56, h * 0.15, w * 0.44, h * 0.8).fill(C('#d6e4ff'), 0.8).rect(w * 0.44, h * 0.15, w * 0.12, h * 0.8).fill('#eceef1', 1);
     g.rect(0, h * 0.15, w, h * 0.8).stroke(c, 0.7);
-    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { g.circle(w * (0.06 + i * 0.1), h * (0.32 + j * 0.24), 4).fill('#ffffff', 1, C('#e5302f'), 0.6); g.circle(w * (0.64 + i * 0.1), h * (0.32 + j * 0.24), 3.5).fill(C('#1e5eff'), 1); }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) { g.circle(w * (0.06 + i * 0.1), h * (0.32 + j * 0.24), 4).fill(PAPER, 1, C('#e5302f'), 0.6); g.circle(w * (0.64 + i * 0.1), h * (0.32 + j * 0.24), 3.5).fill(C('#1e5eff'), 1); }
     g.text(w * 0.22, h * 0.07, 'p', 14, c, { bold: 1 }).text(w * 0.78, h * 0.07, 'n', 14, c, { bold: 1 }).text(w / 2, h * 0.07, 'depletion', 10, '#5b6270');
   } },
   and: { ch: 'semi', name: 'AND gate', w: 120, h: 70, kw: 'logic', draw: (g, w, h, C, c) => { g.line(0, h * 0.3, w * 0.25, h * 0.3).line(0, h * 0.7, w * 0.25, h * 0.7).line(w * 0.5 + h * 0.4, h / 2, w, h / 2).M(w * 0.25, h * 0.1).L(w * 0.5, h * 0.1).arc(w * 0.5, h / 2, h * 0.4, h * 0.4, -PI / 2, PI / 2, true).L(w * 0.25, h * 0.9).Z().stroke(c); } },
