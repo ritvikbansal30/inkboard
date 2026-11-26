@@ -104,7 +104,11 @@ const DEFAULT_PRESETS = [
 const PALETTE = ['#000000', '#3c3c3c', '#7a7a7a', '#bdbdbd', '#ffffff', '#e5302f', '#ff6b35', '#ffb000', '#ffe14d', '#c6f432',
   '#12a150', '#1fd1a5', '#00b8d9', '#1e5eff', '#3b2ccf', '#8e44ff', '#d63ad6', '#ff4fa3', '#8b5a2b', '#0b3d2e'];
 const QUICK = ['#111111', '#ffffff', '#e5302f', '#1e5eff', '#12a150', '#ff8c00', '#8e44ff', '#ffe14d'];
-const BG_COLORS = [['#ffffff', 'White'], ['#f7f3e8', 'Paper'], ['#111316', 'Black'], ['#1f3b2d', 'Chalkboard'], ['#14213d', 'Navy'], ['#2b2f36', 'Slate']];
+const BG_COLORS = [['#ffffff', 'White'], ['#f7f3e8', 'Paper'], ['#eef1f4', 'Mist'], ['#eaf6ee', 'Mint'], ['#e8f1fb', 'Sky'], ['#fdeef2', 'Blush'],
+  ['#111316', 'Black'], ['#1f3b2d', 'Chalkboard'], ['#14213d', 'Navy'], ['#2b2f36', 'Slate'], ['#3a2a20', 'Cocoa'], ['#2a1f3d', 'Plum']];
+const PATTERNS = [['none', 'Plain'], ['grid', 'Boxes'], ['graph', 'Graph'], ['dots', 'Dots'], ['iso', 'Iso dots'], ['lines', 'Ruled'], ['cornell', 'Cornell'], ['staff', 'Columns']];
+const GAPS = [[24, 'Small'], [40, 'Medium'], [64, 'Large']];
+const SIZES = { wide: [1600, 900, '16:9'], std: [1600, 1200, '4:3'], a4: [1240, 1754, 'A4'], square: [1400, 1400, 'Square'] };
 const SHAPES = ['line', 'arrow', 'darrow', 'rect', 'ellipse', 'triangle', 'diamond', 'axes'];
 const SHAPE_NAMES = { line: 'Line', arrow: 'Arrow', darrow: 'Double arrow', rect: 'Rectangle', ellipse: 'Ellipse', triangle: 'Triangle', diamond: 'Diamond', axes: 'Axes' };
 
@@ -124,14 +128,15 @@ const S = {
   text: LS.get('text', { color: '#111111', fs: 36 }),
   eraser: LS.get('eraser', { mode: 'stroke', size: 24 }),
   recent: LS.get('recent', []),
-  defaultBg: LS.get('defaultBg', { color: '#ffffff', pattern: 'none', image: null }),
+  defaultBg: LS.get('defaultBg', { color: '#ffffff', pattern: 'none', gap: 40, image: null }),
+  pageSize: LS.get('pageSize', 'wide'),
   view: { scale: 1, x: 0, y: 0 },
   sel: new Set(),
   undo: [], redo: [],
   hover: null, laser: [], editingText: null, hiddenId: null, present: false,
 };
 const activePreset = () => S.presets.find(p => p.id === S.activePreset) || S.presets[0];
-const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); };
+const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); };
 const curPage = () => S.nb.pages[S.pageIdx];
 
 /* ================= geometry: items → drawable ops ================= */
@@ -293,6 +298,7 @@ function getImage(key) {
   });
   return null;
 }
+function loadImage(key) { const e = imgCache.get(key); if (e?.img) return Promise.resolve(e.img); return DB.get('blobs', key).then(blob => blob && new Promise(r => { const im = new Image(); im.onload = () => { imgCache.set(key, { img: im }); r(im); }; im.onerror = () => r(null); im.src = URL.createObjectURL(blob); })); }
 const pdfDocs = new Map();
 function getPdfDoc(src) {
   if (!pdfDocs.has(src)) {
@@ -363,19 +369,27 @@ function drawBoardBg(ctx, p, unit) {
     const im = getImage(bg.image);
     if (im) { const s = Math.max(p.w / im.width, p.h / im.height), w = im.width * s, h = im.height * s; ctx.save(); ctx.beginPath(); ctx.rect(0, 0, p.w, p.h); ctx.clip(); ctx.drawImage(im, (p.w - w) / 2, (p.h - h) / 2, w, h); ctx.restore(); }
   }
-  const pat = bg.pattern;
-  if (pat && pat !== 'none') {
-    const dark = lum(bg.color) < 0.45, g = 40;
-    ctx.strokeStyle = ctx.fillStyle = dark ? 'rgba(255,255,255,.10)' : 'rgba(30,80,140,.16)';
-    ctx.lineWidth = Math.max(unit, 0.6);
-    if (pat === 'dots') { const r = Math.max(1.6, unit * 1.2); for (let y = g; y < p.h; y += g) for (let x = g; x < p.w; x += g) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); } }
-    else {
-      ctx.beginPath();
-      for (let y = g; y < p.h; y += g) { ctx.moveTo(0, y); ctx.lineTo(p.w, y); }
-      if (pat === 'grid') for (let x = g; x < p.w; x += g) { ctx.moveTo(x, 0); ctx.lineTo(x, p.h); }
-      ctx.stroke();
-      if (pat === 'lines') { ctx.strokeStyle = dark ? 'rgba(255,120,120,.25)' : 'rgba(230,60,60,.3)'; ctx.beginPath(); ctx.moveTo(90, 0); ctx.lineTo(90, p.h); ctx.stroke(); }
-    }
+  drawPattern(ctx, p, unit, bg);
+}
+function drawPattern(ctx, p, unit, bg) {
+  const pat = bg.pattern; if (!pat || pat === 'none') return;
+  const dark = lum(bg.color) < 0.45, g = bg.gap || 40, W = p.w, H = p.h;
+  const ink = dark ? '255,255,255' : '30,80,140', A = dark ? 0.13 : 0.18;
+  const col = a => `rgba(${ink},${a})`;
+  ctx.lineWidth = Math.max(unit, 0.6);
+  const hl = (y0, step, x0 = 0, x1 = W, y1 = H) => { ctx.beginPath(); for (let y = y0; y < y1; y += step) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); } ctx.stroke(); };
+  const vl = step => { ctx.beginPath(); for (let x = step; x < W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); } ctx.stroke(); };
+  const dot = (x, y, r) => { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, 7); };
+  const red = dark ? 'rgba(255,120,120,.3)' : 'rgba(230,60,60,.35)';
+  ctx.strokeStyle = ctx.fillStyle = col(A);
+  switch (pat) {
+    case 'grid': hl(g, g); vl(g); break;
+    case 'graph': { const m = g / 4; ctx.strokeStyle = col(A * 0.5); hl(m, m); vl(m); ctx.strokeStyle = col(A * 1.4); ctx.lineWidth = Math.max(unit * 1.4, 1); hl(g * 1.25, g * 1.25); vl(g * 1.25); break; }
+    case 'dots': { const r = Math.max(1.6, unit * 1.2) * (g / 40) ** 0.3; ctx.beginPath(); for (let y = g; y < H; y += g) for (let x = g; x < W; x += g) dot(x, y, r); ctx.fill(); break; }
+    case 'iso': { const r = Math.max(1.5, unit * 1.1), dy = g * 0.866; ctx.beginPath(); let row = 0; for (let y = dy; y < H; y += dy, row++) for (let x = row % 2 ? g : g / 2; x < W; x += g) dot(x, y, r); ctx.fill(); break; }
+    case 'lines': hl(g * 1.5, g); ctx.strokeStyle = red; ctx.beginPath(); ctx.moveTo(g * 2.2, 0); ctx.lineTo(g * 2.2, H); ctx.stroke(); break;
+    case 'cornell': { const cx = W * 0.28, sy = H * 0.78; hl(g * 2.5, g, 0, W, sy); ctx.strokeStyle = red; ctx.lineWidth = Math.max(unit * 2, 1.5); ctx.beginPath(); ctx.moveTo(0, g * 1.5); ctx.lineTo(W, g * 1.5); ctx.moveTo(cx, g * 1.5); ctx.lineTo(cx, sy); ctx.moveTo(0, sy); ctx.lineTo(W, sy); ctx.stroke(); break; }
+    case 'staff': { const n = 2, cw = W / n; ctx.strokeStyle = col(A * 1.6); ctx.lineWidth = Math.max(unit * 1.5, 1); ctx.beginPath(); for (let i = 1; i < n; i++) { ctx.moveTo(cw * i, g); ctx.lineTo(cw * i, H - g); } ctx.stroke(); ctx.strokeStyle = col(A * 0.6); ctx.lineWidth = Math.max(unit, 0.6); hl(g * 1.5, g); break; }
   }
 }
 function drawBg() {
@@ -785,10 +799,11 @@ function gotoPage(i) {
   saveSoon();
 }
 function updatePageUI() { $('#pageInput').value = S.pageIdx + 1; $('#pageCount').textContent = '/ ' + S.nb.pages.length; }
-function addBlankPage(after = S.pageIdx) {
+function addBlankPage(after = S.pageIdx, opt) {
   const before = S.nb.pages.slice(), cp = curPage();
-  const bg = cp && cp.kind === 'blank' ? cp.bg : S.defaultBg;
-  const np = blankPage(bg, cp && cp.kind === 'blank' ? cp.w : 1600, 900);
+  const bg = opt?.bg || (cp && cp.kind === 'blank' && cp.bg ? cp.bg : S.defaultBg);
+  const [w, h] = SIZES[opt?.size || S.pageSize] || SIZES.wide;
+  const np = blankPage(bg, w, h);
   S.nb.pages.splice(after + 1, 0, np); commitPages(before); buildThumbs(); gotoPage(after + 1);
 }
 function deletePage() {
@@ -878,7 +893,7 @@ function renderDock() {
   dock.innerHTML =
     b('select', 'lasso', 'Select / lasso (V)') + b('hand', 'hand', 'Pan (hold Space)') +
     '<div class="sep"></div>' +
-    S.presets.map((p, i) => `<button class="nib${t === 'ink' && p.id === S.activePreset ? ' on' : ''}" data-preset="${p.id}" title="${esc((STYLES[p.style]?.label || '') + ' · ' + p.size + 'px' + (i < 9 ? ' (' + (i + 1) + ')' : ''))} — click again to edit">${nibSVG(p)}</button>`).join('') +
+    S.presets.map((p, i) => { const hl = p.kind === 'highlighter', d = clamp(7 + p.size * 1.6, 8, 24); return `<button class="pslot${t === 'ink' && p.id === S.activePreset ? ' on' : ''}" data-preset="${p.id}" title="${esc((STYLES[p.style]?.label || '') + ' · ' + p.size + 'px' + (i < 9 ? ' (' + (i + 1) + ')' : ''))} — click again to edit"><i style="background:${p.color};width:${hl ? 24 : d}px;height:${hl ? Math.min(10, d) : d}px;border-radius:${hl ? 3 : 99}px;opacity:${hl ? Math.max(0.55, p.opacity) : p.opacity}"></i></button>`; }).join('') +
     `<button class="addpen" data-act="addpen" title="Save a new pen">${icon('plus')}</button>` +
     '<div class="sep"></div>' +
     b('eraser', 'eraser', 'Eraser (E) — click again for options', '<span class="caret"></span>') +
@@ -935,7 +950,7 @@ function applySize(v) {
 const pop = $('#popover');
 let popAnchor = null;
 function openPopover(anchor, html, mount, place = 'auto') {
-  pop.innerHTML = html; pop.hidden = false; popAnchor = anchor;
+  pop.innerHTML = html; pop.hidden = false; popAnchor = anchor; pop.classList.toggle('wide', html.includes('data-wide'));
   const r = anchor.getBoundingClientRect(), pr = pop.getBoundingClientRect();
   let left = clamp(r.left + r.width / 2 - pr.width / 2, 8, innerWidth - pr.width - 8);
   let top = (place === 'below' || r.top < innerHeight / 2) ? r.bottom + 8 : r.top - pr.height - 10;
@@ -1051,7 +1066,7 @@ function openPageMenu(anchor) {
 }
 $('#pageMenu').onclick = e => openPageMenu(e.currentTarget);
 $('#btnInsert').onclick = e => menu(e.currentTarget, [
-  { label: 'Blank page after this one', icon: 'page', k: 'B', run: () => addBlankPage() },
+  { label: 'Blank page after this one…', icon: 'page', k: 'B', run: () => openAddPagePopover($('#addPage')) },
   { label: 'Image…', icon: 'image', k: 'Cmd V pastes', run: () => pickFile('#fileImg', f => insertImage(f)) },
   { label: 'PDF pages after this one…', icon: 'file', run: () => pickFile('#filePdf', f => importPdf(f, true)) },
   '-',
@@ -1066,29 +1081,62 @@ $('#btnExport').onclick = e => menu(e.currentTarget, [
   { label: 'Restore from backup…', icon: 'upload', run: () => pickFile('#fileBackup', importBackup) },
 ], 'below');
 $('#btnBg').onclick = e => openBgPopover(e.currentTarget);
+function bgEditorHTML(bg) {
+  const preset = BG_COLORS.some(([c]) => c === bg.color);
+  return `<div class="lbl">Colour</div>
+    <div class="bgsw">${BG_COLORS.map(([c, n]) => `<button data-c="${c}" title="${n}" style="background:${c}" class="${bg.color === c ? 'on' : ''}"></button>`).join('')}
+      <label class="bgcustom${preset ? '' : ' on'}" title="Any colour"${preset ? '' : ` style="background:${bg.color}"`}><input type="color" data-custom value="${bg.color}"></label></div>
+    <div class="lbl">Pattern</div>
+    <div class="pat">${PATTERNS.map(([k, n]) => `<button data-p="${k}" class="${(bg.pattern || 'none') === k ? 'on' : ''}"><canvas width="160" height="100"></canvas><span>${n}</span></button>`).join('')}</div>
+    <div class="row"><label>Spacing</label><div class="seg">${GAPS.map(([g, n]) => `<button data-g="${g}" class="${(bg.gap || 40) === g ? 'on' : ''}">${n}</button>`).join('')}</div></div>
+    <div class="btnrow"><button class="pbtn" data-img>${icon('image')}${bg.image ? 'Change image' : 'Background image…'}</button>${bg.image ? '<button class="pbtn" data-noimg>Remove image</button>' : ''}</div>`;
+}
+function wireBgEditor(el, bg, onChange) {
+  const previews = () => el.querySelectorAll('.pat button').forEach(b => {
+    const c = b.querySelector('canvas').getContext('2d'), s = 160 / 420;
+    c.setTransform(s, 0, 0, s, 0, 0); drawBoardBg(c, { w: 420, h: 262, bg: { ...bg, image: null, pattern: b.dataset.p } }, 1 / s);
+  });
+  const changed = () => { previews(); onChange(); };
+  previews();
+  el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { bg.color = b.dataset.c; el.querySelectorAll('.bgsw [data-c]').forEach(x => x.classList.toggle('on', x === b)); const cu = el.querySelector('.bgcustom'); cu.classList.remove('on'); cu.style.background = ''; changed(); });
+  el.querySelector('[data-custom]').oninput = e => { bg.color = e.target.value; el.querySelectorAll('.bgsw [data-c]').forEach(x => x.classList.remove('on')); const cu = el.querySelector('.bgcustom'); cu.classList.add('on'); cu.style.background = bg.color; changed(); };
+  el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { bg.pattern = b.dataset.p; el.querySelectorAll('[data-p]').forEach(x => x.classList.toggle('on', x === b)); changed(); });
+  el.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { bg.gap = +b.dataset.g; el.querySelectorAll('[data-g]').forEach(x => x.classList.toggle('on', x === b)); changed(); });
+  el.querySelector('[data-img]').onclick = () => pickFile('#fileImg', async f => { const key = uid(); await DB.put('blobs', f, key); bg.image = key; changed(); toast('Background image set'); });
+  el.querySelector('[data-noimg]')?.addEventListener('click', () => { bg.image = null; changed(); });
+}
 function openBgPopover(anchor) {
-  const p = curPage(), bg = { ...pageBg(p) };
-  const pdfNote = p.kind === 'pdf' ? '<div class="note">This is a PDF page, so its own design is the background. These settings apply to blank pages.</div>' : '';
-  openPopover(anchor, `<h4>Page background</h4>${pdfNote}
-    <div class="bgsw">${BG_COLORS.map(([c, n]) => `<button data-c="${c}" title="${n}" style="background:${c}" class="${bg.color === c ? 'on' : ''}"></button>`).join('')}</div>
-    <div class="row"><label>Custom</label><input type="color" data-custom value="${bg.color}" style="width:48px;height:28px;border:0;background:none;padding:0"></div>
-    <div class="pat">${['none', 'grid', 'lines', 'dots'].map(k => `<button data-p="${k}" class="${(bg.pattern || 'none') === k ? 'on' : ''}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div>
-    <div class="btnrow"><button class="pbtn" data-img>${icon('image')}${bg.image ? 'Change image' : 'Background image…'}</button>${bg.image ? `<button class="pbtn" data-noimg>Remove image</button>` : ''}</div>
-    <div class="row" style="margin-top:12px"><label class="toggle"><input type="checkbox" data-all> Apply to all blank pages</label></div>
-    <div class="btnrow"><button class="pbtn" data-default>Use as default for new pages</button></div>`, el => {
+  const p = curPage(), isPdf = p.kind === 'pdf';
+  const bg = { gap: 40, ...(isPdf ? S.defaultBg : pageBg(p)) };
+  let scope = isPdf ? 'all' : 'page';
+  openPopover(anchor, `<h4 data-wide>Page style</h4>
+    ${isPdf ? '<div class="note">This is a PDF page, which keeps its own look. Changes here style your blank pages and every new page you add.</div>' : ''}
+    ${bgEditorHTML(bg)}
+    <div class="row" style="margin-top:12px"><label>Apply to</label><div class="seg"><button data-s="page" class="${scope === 'page' ? 'on' : ''}" ${isPdf ? 'disabled style="opacity:.35"' : ''}>This page</button><button data-s="all" class="${scope === 'all' ? 'on' : ''}">All blank pages</button></div></div>
+    <div class="row"><label class="toggle"><input type="checkbox" data-def checked> Also use for new pages</label></div>
+    <div class="btnrow"><button class="pbtn primary" data-add>${icon('plus')}Add a page in this style</button></div>`, el => {
     const apply = () => {
-      const all = el.querySelector('[data-all]').checked;
-      const targets = all ? S.nb.pages.filter(x => x.kind === 'blank') : (p.kind === 'blank' ? [p] : []);
-      if (!targets.length) { S.defaultBg = { ...bg }; savePrefs(); toast('Saved as default for new blank pages'); return; }
-      targets.forEach(t => { t.bg = { ...bg }; thumbDirty(t); }); markSave(); invalidate('bg', 'ink');
+      const targets = scope === 'all' ? S.nb.pages.filter(x => x.kind === 'blank') : [p];
+      targets.forEach(t => { t.bg = { ...bg }; thumbDirty(t); });
+      if (el.querySelector('[data-def]').checked) { S.defaultBg = { ...bg }; savePrefs(); }
+      if (targets.length) { markSave(); invalidate('bg', 'ink'); }
     };
-    el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { bg.color = b.dataset.c; el.querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === b)); apply(); });
-    el.querySelector('[data-custom]').oninput = e => { bg.color = e.target.value; apply(); };
-    el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { bg.pattern = b.dataset.p; el.querySelectorAll('[data-p]').forEach(x => x.classList.toggle('on', x === b)); apply(); });
-    el.querySelector('[data-img]').onclick = () => pickFile('#fileImg', async f => { const key = uid(); await DB.put('blobs', f, key); bg.image = key; apply(); closePopover(); toast('Background image set'); });
-    el.querySelector('[data-noimg]')?.addEventListener('click', () => { bg.image = null; apply(); closePopover(); });
-    el.querySelector('[data-all]').onchange = () => apply();
-    el.querySelector('[data-default]').onclick = () => { S.defaultBg = { ...bg }; savePrefs(); toast('Default background saved'); };
+    wireBgEditor(el, bg, apply);
+    el.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { if (b.disabled) return; scope = b.dataset.s; el.querySelectorAll('[data-s]').forEach(x => x.classList.toggle('on', x === b)); apply(); });
+    el.querySelector('[data-def]').onchange = apply;
+    el.querySelector('[data-add]').onclick = () => { S.defaultBg = { ...bg }; savePrefs(); closePopover(); addBlankPage(S.pageIdx, { bg: { ...bg } }); };
+  }, 'below');
+}
+function openAddPagePopover(anchor) {
+  const bg = { gap: 40, ...S.defaultBg }; let size = S.pageSize || 'wide';
+  openPopover(anchor, `<h4 data-wide>New page</h4>
+    <div class="row"><label>Size</label><div class="seg">${Object.entries(SIZES).map(([k, v]) => `<button data-z="${k}" class="${size === k ? 'on' : ''}">${v[2]}</button>`).join('')}</div></div>
+    ${bgEditorHTML(bg)}
+    <div class="btnrow"><button class="pbtn primary" data-add>${icon('plus')}Add page</button></div>
+    <div class="note">Press B to add another page like this instantly.</div>`, el => {
+    wireBgEditor(el, bg, () => {});
+    el.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { size = b.dataset.z; el.querySelectorAll('[data-z]').forEach(x => x.classList.toggle('on', x === b)); });
+    el.querySelector('[data-add]').onclick = () => { S.defaultBg = { ...bg }; S.pageSize = size; savePrefs(); closePopover(); addBlankPage(S.pageIdx, { bg: { ...bg }, size }); };
   }, 'below');
 }
 function pickFile(sel, cb) { const inp = $(sel); inp.value = ''; inp.onchange = () => { const f = inp.files[0]; if (f) cb(f); }; inp.click(); }
@@ -1212,16 +1260,11 @@ async function exportPdf(onlyAnnotated) {
         const cb = pg.getCropBox(); s = cb.width / p.w; ox = cb.x; oy = cb.y + cb.height;
       } else {
         pg = out.addPage([p.w, p.h]); const bg = pageBg(p);
-        pg.drawRectangle({ x: 0, y: 0, width: p.w, height: p.h, color: col(bg.color) });
-        if (bg.image) { const im = await embedImg(bg.image); if (im) { const k = Math.max(p.w / im.width, p.h / im.height); pg.drawImage(im, { x: (p.w - im.width * k) / 2, y: (p.h - im.height * k) / 2, width: im.width * k, height: im.height * k }); } }
-        if (bg.pattern && bg.pattern !== 'none') {
-          const dark = lum(bg.color) < .45, lc = dark ? rgb(1, 1, 1) : rgb(.12, .31, .55), op = dark ? .1 : .16;
-          if (bg.pattern === 'dots') { for (let y = 40; y < p.h; y += 40) for (let x = 40; x < p.w; x += 40) pg.drawCircle({ x, y: p.h - y, size: 1.6, color: lc, opacity: op }); }
-          else {
-            for (let y = 40; y < p.h; y += 40) pg.drawLine({ start: { x: 0, y: p.h - y }, end: { x: p.w, y: p.h - y }, thickness: .6, color: lc, opacity: op });
-            if (bg.pattern === 'grid') for (let x = 40; x < p.w; x += 40) pg.drawLine({ start: { x, y: 0 }, end: { x, y: p.h }, thickness: .6, color: lc, opacity: op });
-          }
-        }
+        if (bg.image) await loadImage(bg.image);
+        const k = 2, cv = document.createElement('canvas'); cv.width = Math.round(p.w * k); cv.height = Math.round(p.h * k);
+        const c2 = cv.getContext('2d'); c2.scale(k, k); drawBoardBg(c2, p, 1 / k);
+        const png = await out.embedPng(await (await new Promise(r => cv.toBlob(r, 'image/png'))).arrayBuffer());
+        pg.drawImage(png, { x: 0, y: 0, width: p.w, height: p.h });
       }
       const order = [...p.items.filter(i => i.t === 'img'), ...p.items.filter(i => i.t !== 'img' && i.hl), ...p.items.filter(i => i.t !== 'img' && !i.hl)];
       for (const it of order) {
@@ -1406,7 +1449,7 @@ $('#btnSidebar').onclick = () => { $('#sidebar').classList.toggle('hidden'); LS.
 if (LS.get('sidebar', true) === false) $('#sidebar').classList.add('hidden');
 $('#prevPage').onclick = () => gotoPage(S.pageIdx - 1);
 $('#nextPage').onclick = () => gotoPage(S.pageIdx + 1);
-$('#addPage').onclick = () => addBlankPage();
+$('#addPage').onclick = e => openAddPagePopover(e.currentTarget);
 $('#pageInput').addEventListener('change', e => gotoPage((parseInt(e.target.value, 10) || 1) - 1));
 $('#pageInput').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') e.target.blur(); });
 $('#nbName').addEventListener('change', e => { S.nb.name = e.target.value.trim() || 'Untitled'; document.title = S.nb.name + ' — Inkboard'; markSave(); });
@@ -1456,7 +1499,7 @@ window.addEventListener('keydown', e => {
     case 'r': S.shape.kind = 'rect'; savePrefs(); setTool('shape'); break;
     case 'o': S.shape.kind = 'ellipse'; savePrefs(); setTool('shape'); break;
     case 'i': S.shape.kind = 'line'; savePrefs(); setTool('shape'); break;
-    case 'b': addBlankPage(); break;
+    case 'b': addBlankPage(S.pageIdx, { bg: curPage().kind === 'blank' && curPage().bg ? curPage().bg : S.defaultBg }); break;
     case 'f': togglePresent(); break;
     case '?': case '/': openHelp(); break;
     case '[': case ']': { const sc = sizeChoices(), f = k === ']' ? 1.25 : 0.8; applySize(r2(clamp(sc.cur * f, 0.5, 160))); toast('Size ' + sizeChoices().cur, 700); break; }

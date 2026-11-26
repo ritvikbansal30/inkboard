@@ -115,11 +115,17 @@ svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .shapegrid svg.i{width:22px;height:22px}
 .toggle{display:flex;align-items:center;gap:8px;cursor:pointer;color:#cfd3db}
 .toggle input{accent-color:var(--accent);width:16px;height:16px}
-.bgsw{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin:6px 0}
-.bgsw button{height:34px;border-radius:8px;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.15)}
-.bgsw button.on{box-shadow:inset 0 0 0 2px var(--accent2)}
+.bgsw{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin:2px 0 4px}
+.bgsw button,.bgcustom{height:30px;border-radius:8px;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.15)}
+.bgsw button.on,.bgcustom.on{box-shadow:inset 0 0 0 2px var(--accent2),0 0 0 2px rgba(8,189,128,.3)}
+.bgcustom{position:relative;cursor:pointer;background:conic-gradient(#ff4d4d,#ffd24d,#4dff88,#4dd2ff,#7a4dff,#ff4dd2,#ff4d4d)}
+.bgcustom input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+#popover.wide{width:400px;max-width:calc(100vw - 16px)}
+#popover .lbl{font-size:12px;color:var(--muted);margin:12px 2px 6px}
 .pat{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.pat button{height:44px;border-radius:8px;background:#f4f4f1;border:2px solid transparent;color:#333;font-size:11px}
+.pat button{padding:4px 4px 5px;border-radius:9px;background:#121418;border:2px solid transparent;color:var(--muted);font-size:11px;display:flex;flex-direction:column;gap:4px;align-items:center}
+.pat canvas{width:100%;aspect-ratio:16/10;border-radius:5px;display:block}
+.pat button:hover{border-color:rgba(255,255,255,.18)}
 .pat button.on{border-color:var(--accent)}
 .note{color:var(--muted);font-size:12px;line-height:1.45;margin:6px 2px}
 
@@ -181,3 +187,10 @@ body.present #stage{background:#000}
 .tablet-steps{margin:0;padding-left:20px;line-height:1.6;font-size:13.5px;color:#cfd3db}
 .tablet-steps b{color:#fff}
 .home-top .pbtn{flex:none;padding:9px 14px}
+
+/* pen slots (colour markers) */
+.pslot{width:38px;height:38px;flex:none;border-radius:10px;background:#f4f5f7;display:grid;place-items:center;border:2px solid transparent;margin:0 1px;transition:transform .12s}
+.pslot:hover{transform:translateY(-2px)}
+.pslot.on{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(8,189,128,.28)}
+.pslot i{display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+#popover .row label.toggle{width:auto;color:#cfd3db;font-size:13px}
