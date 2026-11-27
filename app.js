@@ -202,7 +202,7 @@ function arrowOps(ops, st, x1, y1, x2, y2, both) {
 function shapeOps(s) {
   const { x1, y1, x2, y2, size: w, color, opacity: a, dash, fill, kind } = s;
   const st = { stroke: color, width: w, alpha: a ?? 1, dash: dash ? [w * 2.6, w * 2.2] : null };
-  const fx = fill ? { fill: color, fillAlpha: 0.22 * (a ?? 1) } : {};
+  const fx = fill ? { fill: color, fillAlpha: (s.fo ?? 0.22) * (a ?? 1) } : {};
   const ops = [];
   const L = Math.min(x1, x2), R = Math.max(x1, x2), T = Math.min(y1, y2), B = Math.max(y1, y2);
   switch (kind) {
@@ -655,7 +655,7 @@ stage.addEventListener('pointerdown', e => {
     C.live.style.mixBlendMode = drag.item.hl ? C.hl.style.mixBlendMode : 'normal';
     if (S.sel.size) { S.sel.clear(); updateSelBar(); }
   } else if (tool === 'shape') {
-    drag = { mode: 'shape', follow: true, s: { t: 'shape', kind: S.shape.kind, x1: P.x, y1: P.y, x2: P.x, y2: P.y, color: S.shape.color, size: S.shape.size, opacity: 1, dash: S.shape.dash, fill: S.shape.fill } };
+    drag = { mode: 'shape', follow: true, s: { t: 'shape', kind: S.shape.kind, x1: P.x, y1: P.y, x2: P.x, y2: P.y, color: S.shape.color, size: S.shape.size, opacity: 1, dash: S.shape.dash, fill: S.shape.fill, fo: S.shape.fo ?? 0.22 } };
     if (S.sel.size) { S.sel.clear(); updateSelBar(); }
   } else if (tool === 'eraser') {
     drag = { mode: 'erase', before: page.items, last: P };
@@ -1120,7 +1120,7 @@ dock.addEventListener('click', e => {
     if (pp?.kind === 'laser' && S.tool === 'laser') return openToolPopover('laser', el);
     if (S.tool === 'ink' && S.activePreset === el.dataset.preset) return openPenPopover(el);
     selectPreset(el.dataset.preset);
-  } else if (el.dataset.qs) quickShape(el.dataset.qs);
+  } else if (el.dataset.qs) { if (el.classList.contains('on')) return openToolPopover('shape', el); quickShape(el.dataset.qs); }
   else if (el.dataset.color) applyColor(el.dataset.color);
   else if (el.dataset.size) applySize(+el.dataset.size);
   else if (el.dataset.act === 'colors') openColorPopover(el);
@@ -1241,12 +1241,14 @@ function openToolPopover(tool, anchor) {
       <div class="shapegrid">${SHAPES.map(k => `<button data-k="${k}" class="${S.shape.kind === k ? 'on' : ''}" title="${SHAPE_NAMES[k]}">${icon('s_' + k)}</button>`).join('')}</div>
       <div class="row" style="margin-top:12px"><label>Width</label><input type="range" min="1" max="24" step="0.5" value="${S.shape.size}" data-r><span class="val">${S.shape.size}</span></div>
       <div class="row"><label class="toggle"><input type="checkbox" data-dash ${S.shape.dash ? 'checked' : ''}> Dashed</label><label class="toggle" style="margin-left:18px"><input type="checkbox" data-fill ${S.shape.fill ? 'checked' : ''}> Filled</label></div>
+      <div class="row" data-forow ${S.shape.fill ? '' : 'hidden'}><label>Fill opacity</label><input type="range" min="0.05" max="1" step="0.05" value="${S.shape.fo ?? 0.22}" data-fo><span class="val">${Math.round((S.shape.fo ?? 0.22) * 100)}%</span></div>
       ${paletteHTML(S.shape.color)}
       <div class="note">Tip: hold Shift for perfect squares/circles & 15° angles. While using any pen, hold still at the end of a stroke to snap it into a straight line, rectangle, ellipse or triangle.</div>`, el => {
       el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { S.shape.kind = b.dataset.k; el.querySelectorAll('[data-k]').forEach(x => x.classList.toggle('on', x === b)); savePrefs(); renderDock(); popAnchor = dock.querySelector('[data-tool=shape]'); });
       el.querySelector('[data-r]').oninput = e => { S.shape.size = +e.target.value; e.target.nextElementSibling.textContent = e.target.value; savePrefs(); renderDock(); popAnchor = dock.querySelector('[data-tool=shape]'); };
       el.querySelector('[data-dash]').onchange = e => { S.shape.dash = e.target.checked; savePrefs(); };
-      el.querySelector('[data-fill]').onchange = e => { S.shape.fill = e.target.checked; savePrefs(); };
+      el.querySelector('[data-fill]').onchange = e => { S.shape.fill = e.target.checked; el.querySelector('[data-forow]').hidden = !S.shape.fill; savePrefs(); };
+      el.querySelector('[data-fo]').oninput = e => { S.shape.fo = +e.target.value; e.target.nextElementSibling.textContent = Math.round(S.shape.fo * 100) + '%'; savePrefs(); };
       el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { S.shape.color = b.dataset.c; el.querySelectorAll('.palette .sw').forEach(x => x.classList.toggle('on', x === b)); savePrefs(); renderDock(); popAnchor = dock.querySelector('[data-tool=shape]'); });
       el.querySelector('[data-custom]').oninput = e => { S.shape.color = e.target.value; savePrefs(); renderDock(); popAnchor = dock.querySelector('[data-tool=shape]'); };
     });
