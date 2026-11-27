@@ -58,6 +58,8 @@ const IC = {
   rowplus: '<rect x="3" y="3" width="18" height="11" rx="2"/><path d="M12 16.5v5M9.5 19h5"/>', rowminus: '<rect x="3" y="3" width="18" height="11" rx="2"/><path d="M9.5 19h5"/>',
   colplus: '<rect x="3" y="3" width="11" height="18" rx="2"/><path d="M16.5 12h5M19 9.5v5"/>', colminus: '<rect x="3" y="3" width="11" height="18" rx="2"/><path d="M16.5 12h5"/>',
   header: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18" stroke-width="3"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/>',
+  play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>', pause: '<path d="M7 5v14M17 5v14" stroke-width="3"/>',
   ruler: '<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
   protractor: '<path d="M3 18a9 9 0 0 1 18 0z"/><path d="M12 18l4-6M12 14v4"/>',
   bookmark: '<path d="M6 3h12v18l-6-4-6 4z"/>',
@@ -110,11 +112,8 @@ const STYLES = {
   highlighter: { label: 'Highlighter', thinning: 0, smoothing: 0.75, streamline: 0.62, taper: 0 },
 };
 const DEFAULT_PRESETS = [
-  { id: 'p1', kind: 'pen', style: 'ballpoint', color: '#111111', size: 2, opacity: 1, pressure: false },
-  { id: 'p2', kind: 'pen', style: 'ballpoint', color: '#1e5eff', size: 2, opacity: 1, pressure: false },
-  { id: 'p3', kind: 'pen', style: 'ballpoint', color: '#e5302f', size: 2, opacity: 1, pressure: false },
-  { id: 'p4', kind: 'pen', style: 'ballpoint', color: '#12a150', size: 2, opacity: 1, pressure: false },
-  { id: 'p5', kind: 'pen', style: 'ballpoint', color: '#ff8c00', size: 2, opacity: 1, pressure: false },
+  ...[['p1', '#111111'], ['p2', '#1e5eff'], ['p3', '#e5302f'], ['p4', '#12a150'], ['p5', '#ff8c00'], ['p6', '#8e44ff'], ['p7', '#ff4fa3'], ['p8', '#00b8d9'], ['p9', '#ffd400']]
+    .map(([id, color]) => ({ id, kind: 'pen', style: 'ballpoint', color, size: 4, opacity: 1, pressure: false })),
   { id: 'h1', kind: 'highlighter', style: 'highlighter', color: '#ffe14d', size: 22, opacity: 0.55, pressure: false },
   { id: 'h2', kind: 'highlighter', style: 'highlighter', color: '#7cf29b', size: 22, opacity: 0.55, pressure: false },
   { id: 'l1', kind: 'laser', style: 'laser', color: '#ff2d2d', size: 1, opacity: 1, pressure: false },
@@ -142,8 +141,8 @@ const LS = {
 const S = {
   nb: null, pageIdx: 0,
   tool: 'ink',
-  presets: LS.get('presetsVer', 0) >= 2 ? LS.get('presets', DEFAULT_PRESETS) : DEFAULT_PRESETS.map(p => ({ ...p })),
-  activePreset: LS.get('presetsVer', 0) >= 2 ? LS.get('activePreset', 'p1') : 'p1',
+  presets: LS.get('presetsVer', 0) >= 3 ? LS.get('presets', DEFAULT_PRESETS) : DEFAULT_PRESETS.map(p => ({ ...p })),
+  activePreset: LS.get('presetsVer', 0) >= 3 ? LS.get('activePreset', 'p1') : 'p1',
   lastPen: LS.get('lastPen', 'p1'), lastHl: LS.get('lastHl', 'h1'),
   shape: LS.get('shape', { kind: 'arrow', color: '#e5302f', size: 4, dash: false, fill: false }),
   text: LS.get('text', { color: '#111111', fs: 36 }),
@@ -151,7 +150,7 @@ const S = {
   recent: LS.get('recent', []),
   defaultBg: LS.get('defaultBg', { color: '#ffffff', pattern: 'none', gap: 40, image: null }),
   pageSize: LS.get('pageSize', 'wide'),
-  tablet: Object.assign({ curve: 'normal', min: 0.12, btn2: 'eraser', btn1: 'pan', snap: true, ring: true }, LS.get('tablet', {})),
+  tablet: Object.assign({ curve: 'normal', min: 0.12, btn2: 'eraser', btn1: 'pan', snap: true, ring: true, fingerDraw: false, scribble: true }, LS.get('tablet', {})),
   laserCfg: Object.assign({ mode: 'trail', color: '#ff2d2d', size: 1, fade: 3 }, LS.get('laser', {})),
   penBar: LS.get('penBar', 'pens'),
   tabletKeys: LS.get('tabletKeys', null) || DEFAULT_TKEYS.map(r => ({ ...r })),
@@ -163,7 +162,7 @@ const S = {
   hover: null, laser: [], editingText: null, hiddenId: null, present: false,
 };
 const activePreset = () => S.presets.find(p => p.id === S.activePreset) || S.presets[0];
-const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); LS.set('tablet', S.tablet); LS.set('laser', S.laserCfg); LS.set('penBar', S.penBar); LS.set('tabletKeys', S.tabletKeys); LS.set('sym', S.sym); LS.set('presetsVer', 2); };
+const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); LS.set('tablet', S.tablet); LS.set('laser', S.laserCfg); LS.set('penBar', S.penBar); LS.set('tabletKeys', S.tabletKeys); LS.set('sym', S.sym); LS.set('presetsVer', 3); };
 const curPage = () => S.nb.pages[S.pageIdx];
 
 /* ================= geometry: items → drawable ops ================= */
@@ -478,7 +477,7 @@ function drawLive() {
   const ctx = X.live; clearCtx(ctx); setView(ctx);
   const sc = S.view.scale;
   drawGuide(ctx, sc);
-  if (drag?.mode === 'ink') drawOps(ctx, computeOps(drag.pred?.length ? { ...drag.item, pts: drag.item.pts.concat(drag.pred) } : drag.item, true));
+  if (drag?.mode === 'ink') drawLiveInk(ctx, drag.item, drag.pred);
   if (drag?.mode === 'shape') drawOps(ctx, computeOps(drag.s));
   if (drag?.mode === 'sym') { if (drag.s.w > 2) drawOps(ctx, symOps(drag.s)); }
   else if (!drag && S.hover && S.tool === 'sym' && SYMS[S.sym.kind]) { const g0 = newSym(S.sym.kind, 0, 0); g0.x = S.hover.x - g0.w / 2; g0.y = S.hover.y - g0.h / 2; drawOps(ctx, symOps(g0), 0.4); }
@@ -600,7 +599,9 @@ const saveNow = async () => {
   } catch (e) { console.error(e); $('#saveState').textContent = 'Save failed!'; toast('Could not save: ' + e.message, 4000); }
   saving = false;
 };
-const saveSoon = debounce(saveNow, 700);
+// Save when the pen is resting, never in the middle of a stroke (avoids hitches on big notebooks).
+let saveT = 0;
+function saveSoon() { clearTimeout(saveT); saveT = setTimeout(function go() { if (drag) { saveT = setTimeout(go, 600); return; } (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => saveNow(), { timeout: 2000 }); }, 1200); }
 function markSave() { if (S.nb) S.nb.updated = Date.now(); $('#saveState').textContent = 'Editing…'; saveSoon(); updateSaveUI(); }
 function coverImage() {
   const c = document.querySelector('.thumb[data-i="0"] canvas');
@@ -624,6 +625,8 @@ function buttonAction(e) {
 
 stage.addEventListener('pointerdown', e => {
   if (e.target.closest?.('#selBar, #zoomCtl, .text-editor, .cell-editor')) return;
+  if (e.pointerType === 'touch' && !S.tablet.fingerDraw) { closePopover(); touchDown(e); return; }
+  if (drag && (drag.mode === 'tpan' || drag.mode === 'tpinch')) drag = null;
   closePopover();
   if (S.editingText) { const was = S.editingText; finishText(); if (S.tool === 'text' && !was.fresh) return; if (S.tool === 'text') return; }
   const P = evPt(e); S.hover = P;
@@ -692,6 +695,7 @@ stage.addEventListener('pointerdown', e => {
   invalidate('live');
 });
 stage.addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch' && touches.has(e.pointerId)) { touchMove(e); return; }
   const P = evPt(e); S.hover = P;
   if (!drag) { if (S.guide) { const gh = guideHit(P.x, P.y); stage.style.cursor = gh === 'rotate' ? 'alias' : gh === 'move' || (gh === 'edge' && S.tool !== 'ink') ? 'move' : ''; invalidate('live'); } if (S.tool === 'eraser' || S.tool === 'laser' || (S.tool === 'ink' && S.tablet.ring) || S.tool === 'sym') invalidate('live'); return; }
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
@@ -706,7 +710,10 @@ stage.addEventListener('pointermove', e => {
       if (S.tablet.snap && !drag.snap && !drag.straight && Math.hypot(P.sx - drag.anchor.sx, P.sy - drag.anchor.sy) > 5) { drag.anchor = { sx: P.sx, sy: P.sy }; clearTimeout(drag.holdT); drag.holdT = setTimeout(holdSnap, HOLD_MS); }
       break;
     }
-    case 'shape': if (drag.follow) setShapeEnd(drag.s, P.x, P.y, e.shiftKey); break;
+    case 'shape':
+      if (drag.resize) { const R = drag.resize, s = drag.s; s[R.fx] = P.x - R.ox; s[R.fy] = P.y - R.oy; }
+      else if (drag.follow) setShapeEnd(drag.s, P.x, P.y, e.shiftKey);
+      break;
     case 'erase': {
       const r = S.eraser.size / 4 / S.view.scale, a = drag.last, n = Math.ceil(Math.hypot(P.x - a.x, P.y - a.y) / r);
       for (let i = 1; i <= n; i++) eraseAt(a.x + (P.x - a.x) * i / n, a.y + (P.y - a.y) * i / n);
@@ -742,6 +749,7 @@ stage.addEventListener('pointermove', e => {
   invalidate('live');
 });
 const endDrag = e => {
+  if (e?.pointerType === 'touch' && touches.has(e.pointerId)) { touchUp(e); return; }
   if (!drag) return;
   const d = drag; drag = null; const page = curPage();
   stage.classList.remove('panning');
@@ -749,6 +757,7 @@ const endDrag = e => {
     case 'ink': {
       clearTimeout(d.holdT);
       const it = { ...d.item, id: uid() };
+      if (S.tablet.scribble && !it.hl && !d.snap && !d.straight && scribbleErase(page, it)) { invalidate('ink'); break; }
       const before = page.items; page.items = [...before, it]; commit(page, before);
       if (it.hl) { S.lastHl = activePreset().id; } else S.lastPen = activePreset().id;
       invalidate('ink'); break;
@@ -799,15 +808,18 @@ function setShapeEnd(s, x, y, shift) {
     if (/line|arrow/.test(s.kind)) { const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 12)) * (Math.PI / 12), l = Math.hypot(dx, dy); x = s.x1 + Math.cos(a) * l; y = s.y1 + Math.sin(a) * l; }
     else { const m = Math.max(Math.abs(dx), Math.abs(dy)); x = s.x1 + Math.sign(dx || 1) * m; y = s.y1 + Math.sign(dy || 1) * m; }
   }
+  else if (/line|arrow/.test(s.kind)) { const dx = x - s.x1, dy = y - s.y1, a = Math.atan2(dy, dx), q = Math.round(a / (Math.PI / 2)) * (Math.PI / 2); if (Math.abs(a - q) < 0.09) { const l = Math.hypot(dx, dy); x = s.x1 + Math.cos(q) * l; y = s.y1 + Math.sin(q) * l; } }
   s.x2 = x; s.y2 = y;
 }
 // hold still at the end of a stroke → convert to a clean shape (Drawboard-style)
 function holdSnap() {
   if (!drag || drag.mode !== 'ink' || drag.item.pts.length < 4) return;
   const rec = recognize(drag.item.pts); if (!rec) return;
-  const it = drag.item;
+  const it = drag.item, L = it.pts[it.pts.length - 1];
   drag = { mode: 'shape', follow: rec.kind === 'line', s: { t: 'shape', ...rec, color: it.color, size: it.size, opacity: it.opacity, dash: false, fill: false, hl: it.hl } };
-  invalidate('live');
+  // keep holding and move to resize: the corner nearest the pen follows it
+  if (rec.kind !== 'line') { const s = drag.s, c = [['x1', 'y1'], ['x2', 'y1'], ['x1', 'y2'], ['x2', 'y2']].map(([fx, fy]) => [fx, fy, Math.hypot(s[fx] - L[0], s[fy] - L[1])]).sort((a, b) => a[2] - b[2])[0]; drag.resize = { fx: c[0], fy: c[1], ox: L[0] - s[c[0]], oy: L[1] - s[c[1]] }; }
+  navigator.vibrate?.(15); invalidate('live');
 }
 function recognize(pts) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, len = 0;
@@ -816,11 +828,12 @@ function recognize(pts) {
   if (diag < 10 / S.view.scale) return null;
   const a = pts[0], b = pts[pts.length - 1];
   const closed = Math.hypot(a[0] - b[0], a[1] - b[1]) < Math.max(18 / S.view.scale, diag * 0.22) && len > diag * 1.6;
-  if (!closed) return { kind: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1] };
+  const sq = r => { const w2 = r.x2 - r.x1, h2 = r.y2 - r.y1, m = Math.max(w2, h2); if (Math.abs(w2 - h2) < 0.15 * m) { const cx = (r.x1 + r.x2) / 2, cy = (r.y1 + r.y2) / 2; Object.assign(r, { x1: cx - m / 2, x2: cx + m / 2, y1: cy - m / 2, y2: cy + m / 2 }); } return r; };
+  if (!closed) { const ln = { kind: 'line', x1: a[0], y1: a[1], x2: b[0], y2: b[1] }; setShapeEnd(ln, b[0], b[1], false); return ln; }
   let area = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) area += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]);
   const ratio = Math.abs(area / 2) / (w * h || 1);
-  if (ratio > 0.86) return { kind: 'rect', x1: x0, y1: y0, x2: x1, y2: y1 };
-  if (ratio > 0.66) return { kind: 'ellipse', x1: x0, y1: y0, x2: x1, y2: y1 };
+  if (ratio > 0.86) return sq({ kind: 'rect', x1: x0, y1: y0, x2: x1, y2: y1 });
+  if (ratio > 0.66) return sq({ kind: 'ellipse', x1: x0, y1: y0, x2: x1, y2: y1 });
   if (ratio > 0.36 && ratio < 0.62) {
     const topBand = pts.filter(p => p[1] < y0 + h * 0.2), botBand = pts.filter(p => p[1] > y1 - h * 0.2);
     const span = arr => arr.length ? Math.max(...arr.map(p => p[0])) - Math.min(...arr.map(p => p[0])) : 0;
@@ -983,7 +996,7 @@ const thumbQ = []; let thumbBusy = false;
 function queueThumb(i) { if (!thumbQ.includes(i)) thumbQ.push(i); pumpThumbs(); }
 async function pumpThumbs() {
   if (thumbBusy) return; thumbBusy = true;
-  while (thumbQ.length) { const i = thumbQ.shift(); try { await renderThumb(i); } catch (e) { console.warn(e); } }
+  while (thumbQ.length) { while (drag) await new Promise(r => setTimeout(r, 300)); const i = thumbQ.shift(); try { await renderThumb(i); } catch (e) { console.warn(e); } }
   thumbBusy = false;
 }
 const thumbPdf = new Map();
@@ -1629,7 +1642,9 @@ function renderHome(focusSearch) {
   const pages = all.reduce((s, m) => s + (m.pages || 0), 0);
   const unsaved = FS.dir ? all.filter(m => !m.diskOnly && (!m.savedAt || (m.updated || 0) > m.savedAt)).length : 0;
   const seg = (attr, cur, opts) => `<div class="seg">${opts.map(([v, l]) => `<button data-${attr}="${v}" class="${cur === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
-  const folderBar = !FS.dir
+  const folderBar = !window.showDirectoryPicker
+    ? `${icon('folder')}<span>Your notes autosave on this device. To move a notebook to another device, use <b>Export → Backup notebook</b> here and <b>Import backup file…</b> there.</span>`
+    : !FS.dir
     ? `${icon('folder')}<span>Your notes autosave in this browser. Choose a <b>notes folder</b> to also keep real files you can back up or sync through iCloud Drive.</span><button class="pbtn primary" data-a="folder">Choose notes folder</button>`
     : HS.perm !== 'granted'
       ? `${icon('folder')}<span>Notes folder <b>${esc(FS.dir.name)}</b> needs permission again.</span><button class="pbtn primary" data-a="reconnect">Reconnect folder</button><button class="pbtn" data-a="folder">Change</button>`
@@ -1733,7 +1748,7 @@ async function fsPerm(ask) {
   catch { return false; }
 }
 async function chooseFolder() {
-  if (!window.showDirectoryPicker) { toast('Saving to a folder needs Chrome or Edge', 4000); return false; }
+  if (!window.showDirectoryPicker) { toast(/Android/i.test(navigator.userAgent) ? 'Folders are not available on Android. Notes autosave on this device; use Export → Backup to move them.' : 'Saving to a folder needs Chrome or Edge', 4500); return false; }
   try {
     const h = await showDirectoryPicker({ id: 'inkboard-notes', mode: 'readwrite', startIn: 'documents' });
     FS.dir = h; await DB.put('blobs', h, '__fsroot'); toast('Notes folder: ' + h.name); updateSaveUI(); return true;
@@ -1742,6 +1757,7 @@ async function chooseFolder() {
 function isDirty(nb = S.nb) { return !!nb && (!nb.savedAt || (nb.updated || 0) > nb.savedAt); }
 function updateSaveUI() {
   const b = $('#btnSave'); if (!b || !S.nb) return;
+  if (!window.showDirectoryPicker) { b.classList.remove('dirty'); b.innerHTML = icon('save') + 'Autosaved'; return; }
   const d = isDirty(), label = !FS.dir ? 'Save to folder…' : d ? 'Save changes' : 'Saved';
   b.classList.toggle('dirty', !!FS.dir && d);
   b.innerHTML = icon('save') + label;
@@ -1777,6 +1793,7 @@ async function writeNotebook(nb, cover) {
 let savingFs = false;
 async function saveChanges() {
   if (!S.nb || savingFs) return;
+  if (!window.showDirectoryPicker) { await saveNow(); return toast('Saved on this device'); }
   if (S.editingText) finishText();
   await saveNow();
   if (!FS.dir && !(await chooseFolder())) return toast('Autosaved in this browser');
@@ -1845,6 +1862,8 @@ function openTablet() {
         <div class="row"><label>Upper button</label>${sel('btn1')}</div>
         <label class="toggle"><input type="checkbox" data-snap ${T.snap ? 'checked' : ''}> Hold still to snap a stroke into a shape</label>
         <label class="toggle"><input type="checkbox" data-ring ${T.ring ? 'checked' : ''}> Show a pen-size ring under the cursor</label>
+        <label class="toggle"><input type="checkbox" data-scrib ${T.scribble ? 'checked' : ''}> Scribble over ink to erase it</label>
+        <label class="toggle"><input type="checkbox" data-finger ${T.fingerDraw ? 'checked' : ''}> Draw with finger (off: fingers pan and pinch-zoom, palm ignored)</label>
         <div class="note">Soft gives thick lines with light pressure; Firm needs more force. Pressure only affects pens with "Use pen pressure" on.</div>
       </div>
     </div>
@@ -1895,6 +1914,8 @@ function openTablet() {
   card.querySelectorAll('select[data-k]').forEach(s => s.onchange = () => { T[s.dataset.k] = s.value; savePrefs(); });
   card.querySelector('[data-snap]').onchange = e => { T.snap = e.target.checked; savePrefs(); };
   card.querySelector('[data-ring]').onchange = e => { T.ring = e.target.checked; savePrefs(); invalidate('live'); };
+  card.querySelector('[data-scrib]').onchange = e => { T.scribble = e.target.checked; savePrefs(); };
+  card.querySelector('[data-finger]').onchange = e => { T.fingerDraw = e.target.checked; savePrefs(); };
 }
 $('#btnTablet').onclick = openTablet;
 
@@ -2034,7 +2055,7 @@ const ACTIONS = {
   nextPage: ['Next page', () => gotoPage(S.pageIdx + 1)], prevPage: ['Previous page', () => gotoPage(S.pageIdx - 1)], newPage: ['New page', () => addBlankPage()],
   focus: ['Focus mode', togglePresent], fit: ['Fit page', fitPage], zoomIn: ['Zoom in', () => zoomAt(1.25, stage.clientWidth / 2, stage.clientHeight / 2)], zoomOut: ['Zoom out', () => zoomAt(0.8, stage.clientWidth / 2, stage.clientHeight / 2)],
   sizeUp: ['Pen size +', () => resizeTool(1.25)], sizeDown: ['Pen size −', () => resizeTool(0.8)], bookmark: ['Bookmark page', toggleMark],
-  clear: ['Clear page', clearPage], physics: ['Shapes & physics library', () => toggleLib()], save: ['Save changes', saveChanges], dashboard: ['Dashboard', openHome], none: ['Nothing', () => {}],
+  clear: ['Clear page', clearPage], timer: ['Timer', () => toggleTimer()], physics: ['Shapes & physics library', () => toggleLib()], save: ['Save changes', saveChanges], dashboard: ['Dashboard', openHome], none: ['Nothing', () => {}],
 };
 function comboOf(e) { return [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Cmd', e.code || e.key].filter(Boolean).join('+'); }
 function prettyCombo(c) {
@@ -2199,6 +2220,136 @@ $('#selBar').addEventListener('click', e => {
   if (act === 'rotl') rotSel(-15); else if (act === 'rotr') rotSel(15); else if (act === 'flip') flipSel();
   else if (/^(row|col)[+-]$|^head$/.test(act) && its.length === 1 && its[0].t === 'table') tableEdit(its[0].id, act);
 });
+
+/* ================= scribble to erase ================= */
+function scribblePoints(pts) {
+  const step = 6 / S.view.scale, rs = [pts[0]];
+  for (const p of pts) { const q = rs[rs.length - 1]; if (Math.hypot(p[0] - q[0], p[1] - q[1]) >= step) rs.push(p); }
+  return rs;
+}
+function isScribble(rs) {
+  if (rs.length < 10) return false;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, len = 0, rev = 0;
+  rs.forEach(([x, y], i) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); if (i) len += Math.hypot(x - rs[i - 1][0], y - rs[i - 1][1]); });
+  for (let i = 2; i < rs.length - 2; i++) {
+    const ax = rs[i][0] - rs[i - 2][0], ay = rs[i][1] - rs[i - 2][1], bx = rs[i + 2][0] - rs[i][0], by = rs[i + 2][1] - rs[i][1];
+    const c = (ax * bx + ay * by) / ((Math.hypot(ax, ay) * Math.hypot(bx, by)) || 1);
+    if (c < -0.6) { rev++; i += 2; }
+  }
+  return rev >= 4 && len > Math.hypot(x1 - x0, y1 - y0) * 2.8;
+}
+// Returns true (and erases) when the stroke is a scribble drawn over existing marks.
+function scribbleErase(page, it) {
+  const rs = scribblePoints(it.pts); if (!isScribble(rs)) return false;
+  const r = Math.max(it.size, 8 / S.view.scale), hit = new Set();
+  for (const o of page.items) { if (o.t === 'img' || o.t === 'table') continue; for (const p of rs) if (itemHit(o, p[0], p[1], r)) { hit.add(o.id); break; } }
+  if (!hit.size) return false;
+  const before = page.items; page.items = before.filter(o => !hit.has(o.id)); commit(page, before);
+  navigator.vibrate?.(12); toast(`Scribble erased ${hit.size} item${hit.size > 1 ? 's' : ''} · Cmd/Ctrl Z to undo`, 1600);
+  return true;
+}
+
+/* ================= fast live ink (keeps the pen glued to the tip) ================= */
+function drawLiveInk(ctx, it, pred) {
+  const pts = pred?.length ? it.pts.concat(pred) : it.pts, st = STYLES[it.style] || STYLES.ballpoint;
+  const varies = (it.sim || it.pts.some(p => p[2] !== 0.5)) && st.thinning > 0.05 && !it.hl;
+  if (varies && pts.length < 500) return drawOps(ctx, computeOps({ ...it, pts }, true));
+  ctx.globalAlpha = it.opacity ?? 1; ctx.strokeStyle = fixC(it.color); ctx.lineWidth = it.size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  if (pts.length < 2) ctx.lineTo(pts[0][0] + 0.01, pts[0][1]);
+  for (let i = 1; i < pts.length - 1; i++) ctx.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2);
+  const L = pts[pts.length - 1]; ctx.lineTo(L[0], L[1]); ctx.stroke(); ctx.globalAlpha = 1;
+}
+
+/* ================= touch: fingers pan & pinch, stylus draws (palm rejection) ================= */
+const touches = new Map();
+function startTouchGesture() {
+  const pts = [...touches.values()];
+  if (pts.length === 1) drag = { mode: 'tpan', sx: pts[0].x, sy: pts[0].y, vx: S.view.x, vy: S.view.y, t0: performance.now(), n: 1 };
+  else if (pts.length >= 2) { const [a, b] = pts; drag = { mode: 'tpinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, m0: [(a.x + b.x) / 2, (a.y + b.y) / 2], s0: S.view.scale, vx: S.view.x, vy: S.view.y, t0: performance.now(), n: pts.length, moved: false }; }
+}
+function touchDown(e) {
+  capture(e); touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (drag && drag.mode !== 'tpan' && drag.mode !== 'tpinch') return;   // stylus is busy: ignore the palm
+  startTouchGesture();
+}
+function touchMove(e) {
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const pts = [...touches.values()];
+  if (drag?.mode === 'tpan' && pts.length === 1) { S.view.x = drag.vx + pts[0].x - drag.sx; S.view.y = drag.vy + pts[0].y - drag.sy; S.autoFit = false; viewChanged(); }
+  else if (drag?.mode === 'tpinch' && pts.length >= 2) {
+    const [a, b] = pts, r = stage.getBoundingClientRect(), d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const sc = clamp(drag.s0 * d / drag.d0, 0.05, 24), px = (drag.m0[0] - r.left - drag.vx) / drag.s0, py = (drag.m0[1] - r.top - drag.vy) / drag.s0;
+    if (Math.abs(d - drag.d0) > 12 || Math.hypot(mx - drag.m0[0], my - drag.m0[1]) > 12) drag.moved = true;
+    S.view.scale = sc; S.view.x = mx - r.left - px * sc; S.view.y = my - r.top - py * sc; S.autoFit = false; viewChanged();
+  }
+}
+function touchUp(e) {
+  touches.delete(e.pointerId);
+  if (drag?.mode !== 'tpan' && drag?.mode !== 'tpinch') return;
+  const d = drag; drag = null;
+  if (d.mode === 'tpinch' && !d.moved && performance.now() - d.t0 < 300 && !touches.size) { d.n >= 3 ? redo() : undo(); toast(d.n >= 3 ? 'Redo' : 'Undo', 700); }
+  if (touches.size) startTouchGesture();
+}
+
+/* ================= class timer ================= */
+const timerEl = document.createElement('div'); timerEl.id = 'timer'; timerEl.hidden = true; document.body.appendChild(timerEl);
+const TM = Object.assign({ mode: 'down', total: 300, x: null, y: 70 }, LS.get('timer', {}), { left: 0, end: 0, running: false, t0: 0, acc: 0, tick: 0, rang: false });
+TM.left = TM.total;
+function fmt(sec) { sec = Math.max(0, Math.round(sec)); const m = Math.floor(sec / 60), s = sec % 60; return `${m}:${String(s).padStart(2, '0')}`; }
+function timerNow() { if (TM.mode === 'down') return TM.running ? (TM.end - Date.now()) / 1000 : TM.left; return (TM.acc + (TM.running ? Date.now() - TM.t0 : 0)) / 1000; }
+function beep() {
+  try {
+    const A = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.35, 0.7].forEach(t => { const o = A.createOscillator(), g = A.createGain(); o.frequency.value = 880; o.connect(g); g.connect(A.destination); g.gain.setValueAtTime(0.0001, A.currentTime + t); g.gain.exponentialRampToValueAtTime(0.3, A.currentTime + t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, A.currentTime + t + 0.25); o.start(A.currentTime + t); o.stop(A.currentTime + t + 0.3); });
+  } catch {}
+  navigator.vibrate?.([200, 100, 200]);
+}
+function renderTimer() {
+  const v = timerNow(), done = TM.mode === 'down' && v <= 0;
+  timerEl.classList.toggle('done', done && TM.rang); timerEl.classList.toggle('running', TM.running);
+  timerEl.querySelector('.tm-time').textContent = fmt(v);
+  timerEl.querySelector('[data-t=play]').innerHTML = icon(TM.running ? 'pause' : 'play');
+}
+function timerLoop() {
+  if (!TM.running) return;
+  if (TM.mode === 'down' && timerNow() <= 0) { TM.running = false; TM.left = 0; TM.rang = true; beep(); toast("Time's up", 2500); }
+  renderTimer(); TM.tick = setTimeout(timerLoop, 250);
+}
+function timerPlay() {
+  if (TM.running) { if (TM.mode === 'down') TM.left = timerNow(); else TM.acc += Date.now() - TM.t0; TM.running = false; clearTimeout(TM.tick); return renderTimer(); }
+  if (TM.mode === 'down') { if (TM.left <= 0) TM.left = TM.total; TM.end = Date.now() + TM.left * 1000; } else TM.t0 = Date.now();
+  TM.running = true; TM.rang = false; timerLoop();
+}
+function timerReset() { clearTimeout(TM.tick); TM.running = false; TM.rang = false; TM.left = TM.total; TM.acc = 0; renderTimer(); }
+function timerSet(sec) { TM.mode = 'down'; TM.total = sec; LS.set('timer', { mode: TM.mode, total: TM.total, x: TM.x, y: TM.y }); timerReset(); timerPlay(); }
+function placeTimer() { const w = timerEl.offsetWidth || 220; timerEl.style.left = (TM.x == null ? (innerWidth - w) / 2 : clamp(TM.x, 4, innerWidth - w - 4)) + 'px'; timerEl.style.top = clamp(TM.y, 4, innerHeight - 60) + 'px'; }
+function openTimer() {
+  timerEl.innerHTML = `<span class="tm-grip" title="Drag to move">${icon('timer')}</span><button class="tm-time" title="Presets">${fmt(TM.left)}</button>
+    <button data-t="play" title="Start / pause">${icon('play')}</button><button data-t="reset" title="Reset">${icon('undo')}</button><button data-t="close" title="Close">${icon('x')}</button>`;
+  timerEl.hidden = false; placeTimer(); renderTimer();
+  timerEl.querySelector('[data-t=play]').onclick = timerPlay;
+  timerEl.querySelector('[data-t=reset]').onclick = timerReset;
+  timerEl.querySelector('[data-t=close]').onclick = () => { timerReset(); timerEl.hidden = true; };
+  timerEl.querySelector('.tm-time').onclick = e => openPopover(e.currentTarget, `<h4>Timer</h4>
+    <div class="tpresets">${[[30, '30 s'], [60, '1 min'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [600, '10 min'], [900, '15 min'], [1800, '30 min']].map(([s, l]) => `<button class="pbtn" data-s="${s}">${l}</button>`).join('')}</div>
+    <div class="row" style="margin-top:10px"><label>Custom</label><input type="number" min="1" max="180" value="${Math.round(TM.total / 60)}" data-min style="width:70px;height:32px;background:#121418;border:1px solid var(--line);border-radius:8px;padding:0 8px"><span class="val">min</span><button class="pbtn primary" data-go style="flex:none">Start</button></div>
+    <div class="btnrow"><button class="pbtn" data-sw>${icon('timer')}Stopwatch (count up)</button></div>`, el => {
+      el.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { closePopover(); timerSet(+b.dataset.s); });
+      el.querySelector('[data-go]').onclick = () => { const m = clamp(+el.querySelector('[data-min]').value || 5, 1, 180); closePopover(); timerSet(m * 60); };
+      el.querySelector('[data-min]').onkeydown = ev => ev.stopPropagation();
+      el.querySelector('[data-sw]').onclick = () => { closePopover(); TM.mode = 'up'; LS.set('timer', { mode: 'up', total: TM.total, x: TM.x, y: TM.y }); timerReset(); timerPlay(); };
+    }, 'below');
+  const grip = timerEl.querySelector('.tm-grip');
+  grip.onpointerdown = e => {
+    e.preventDefault(); grip.setPointerCapture(e.pointerId); const r = timerEl.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
+    grip.onpointermove = ev => { TM.x = ev.clientX - ox; TM.y = ev.clientY - oy; placeTimer(); };
+    grip.onpointerup = () => { grip.onpointermove = null; LS.set('timer', { mode: TM.mode, total: TM.total, x: TM.x, y: TM.y }); };
+  };
+}
+function toggleTimer() { if (timerEl.hidden) openTimer(); else { timerReset(); timerEl.hidden = true; } }
+$('#btnTimer').onclick = toggleTimer;
+window.addEventListener('resize', () => { if (!timerEl.hidden) placeTimer(); });
 
 /* ================= keyboard ================= */
 window.addEventListener('keydown', e => {

@@ -39,3 +39,14 @@ Modern Physics includes ready-made derivation diagrams: Bohr atom, H-atom energy
 
 ## Tables
 Insert → Table… (or the Table button in the library). Type straight into cells; Tab moves to the next cell and adds a row at the end. Double-click a cell to edit it later. When a table is selected, its toolbar adds/removes rows and columns and toggles the header row.
+
+## Android (OnePlus Pad + Stylo 2, or any tablet)
+Inkboard runs in Chrome on Android from GitHub Pages: repo **Settings → Pages → Deploy from a branch → main / (root) → Save**,
+then open **https://ritvikbansal30.github.io/inkboard/** on the tablet and choose Chrome menu → **Add to Home screen / Install app**.
+Stylus draws; one finger pans; two fingers pinch-zoom; two-finger tap = undo, three-finger tap = redo; the palm is ignored while you write.
+Notes autosave on the device. Move notebooks between devices with Export → Backup notebook and Import backup file.
+
+## Writing tricks
+- **Hold to shape:** finish a stroke and hold still; it snaps to a line, rectangle, circle/ellipse or triangle. Keep holding and move to resize it.
+- **Scribble to erase:** scribble back and forth over ink to erase it (turn off in Tablet settings).
+- **Timer:** top bar → Timer. Presets 30 s to 30 min, custom minutes, or stopwatch. Drag it anywhere; it beeps and flashes at zero.

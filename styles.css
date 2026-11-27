@@ -273,3 +273,21 @@ body.present #stage{background:#000}
 .tpick i.on{background:rgba(8,189,128,.35);border-color:var(--accent)}
 .cell-editor{position:absolute;z-index:3;box-sizing:border-box;background:rgba(8,189,128,.08);border:2px solid var(--accent);outline:none;resize:none;overflow:hidden;margin:0;padding:0 4px;text-align:center;line-height:1.2;font-family:-apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif}
 #selBar{z-index:7}
+
+/* v6: timer, touch */
+#timer{position:fixed;z-index:60;display:flex;align-items:center;gap:2px;padding:6px 8px;background:rgba(24,27,33,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);touch-action:none}
+#timer[hidden]{display:none}
+#timer .tm-grip{width:30px;height:36px;display:grid;place-items:center;color:var(--muted);cursor:grab}
+#timer .tm-time{font:600 26px/1 ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;padding:4px 10px;border-radius:9px;min-width:96px;color:#fff}
+#timer .tm-time:hover{background:rgba(255,255,255,.07)}
+#timer button[data-t]{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:#cfd3db}
+#timer button[data-t]:hover{background:rgba(255,255,255,.08)}
+#timer.running .tm-time{color:var(--accent2)}
+#timer.done{animation:tmflash .6s ease-in-out 6;border-color:#ff5d5d}
+#timer.done .tm-time{color:#ff6b6b}
+@keyframes tmflash{50%{background:rgba(255,60,60,.35)}}
+@media (prefers-reduced-motion:reduce){#timer.done{animation:none}}
+.tpresets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tpresets .pbtn{padding:8px 4px}
+html,body,#stage{-webkit-touch-callout:none;overscroll-behavior:none}
+@media(max-width:1360px){#btnTimer{font-size:0;gap:0;padding:0 9px}}
