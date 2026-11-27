@@ -1061,7 +1061,7 @@ function renderDock() {
     penButtons(t) +
     `<button class="addpen" data-act="addpen" title="Save a new pen">${icon('plus')}</button>` +
     '<div class="sep"></div>' +
-    [['line', 's_line', 'Straight line in your pen colour', false], ['arrow', 's_arrow', 'Arrow in your pen colour', false], ['darrowd', 's_darrowd', 'Dashed arrow in your pen colour', true]].map(([q, ic, tt, dash]) => `<button class="tool qs${t === 'shape' && S.shape.kind === (q === 'darrowd' ? 'arrow' : q) && !!S.shape.dash === dash ? ' on' : ''}" data-qs="${q}" title="${tt}" style="color:${lum(penColor()) < 0.3 ? '#e9ebf0' : penColor()}">${icon(ic)}</button>`).join('') +
+    [['line', 's_line', 'Straight line in your pen colour', false], ['arrow', 's_arrow', 'Arrow in your pen colour', false], ['darrowd', 's_darrowd', 'Dashed arrow in your pen colour', true], ['rect', 's_rect', 'Rectangle in your pen colour (Shift = square)', false], ['ellipse', 's_ellipse', 'Circle / ellipse in your pen colour (Shift = circle)', false], ['triangle', 's_triangle', 'Triangle in your pen colour', false]].map(([q, ic, tt, dash]) => `<button class="tool qs${t === 'shape' && S.shape.kind === (q === 'darrowd' ? 'arrow' : q) && !!S.shape.dash === dash ? ' on' : ''}" data-qs="${q}" title="${tt}" style="color:${lum(penColor()) < 0.3 ? '#e9ebf0' : penColor()}">${icon(ic)}</button>`).join('') +
     '<div class="sep"></div>' +
     b('eraser', 'eraser', 'Eraser (E) — click again for options', '<span class="caret"></span>') +
     b('shape', 's_' + S.shape.kind, 'Shapes & arrows (A/R/O/I) — click again for options', '<span class="caret"></span>') +
