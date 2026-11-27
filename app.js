@@ -476,6 +476,7 @@ function drawInk() {
 }
 function drawLive() {
   DARK = isDarkPage(curPage());
+  if (drag?.mode === 'ink' && canDrawIncrementally(drag)) return drawInkIncrement(X.live, drag);
   const ctx = X.live; clearCtx(ctx); setView(ctx);
   const sc = S.view.scale;
   drawGuide(ctx, sc);
@@ -503,11 +504,6 @@ function drawLive() {
     ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fill();
     ctx.lineWidth = 1.5 / sc; ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.stroke();
     ctx.beginPath(); ctx.arc(h.x, h.y, r + 1.5 / sc, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 1 / sc; ctx.stroke();
-  }
-  if (h && !drag && S.tool === 'ink' && S.tablet.ring) {
-    const r = Math.max(activePreset().size / 2, 1.5 / sc);
-    ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, 7); ctx.lineWidth = 1 / sc; ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.stroke();
-    ctx.beginPath(); ctx.arc(h.x, h.y, r + 1 / sc, 0, 7); ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.stroke();
   }
   // laser
   const LC = S.laserCfg, now = performance.now(), [lr, lg, lb] = hexToRgb(LC.color), k = LC.size;
@@ -563,7 +559,7 @@ function zoomAt(f, sx, sy) {
   const v = S.view, ns = clamp(v.scale * f, 0.05, 24), k = ns / v.scale;
   v.x = sx - (sx - v.x) * k; v.y = sy - (sy - v.y) * k; v.scale = ns; S.autoFit = false; viewChanged();
 }
-function viewChanged() { if (cellEd) finishCell(); invalidate('bg', 'ink', 'live'); updateSelBar(); $('#zoomPct').textContent = Math.round(S.view.scale * 100) + '%'; if (S.editingText) positionTextEditor(); }
+function viewChanged() { updateCursor(); if (cellEd) finishCell(); invalidate('bg', 'ink', 'live'); updateSelBar(); $('#zoomPct').textContent = Math.round(S.view.scale * 100) + '%'; if (S.editingText) positionTextEditor(); }
 
 /* ================= history ================= */
 function commit(page, before) {
@@ -695,7 +691,7 @@ stage.addEventListener('pointerdown', e => {
 stage.addEventListener('pointermove', e => {
   if (e.pointerType === 'touch' && touches.has(e.pointerId)) { touchMove(e); return; }
   const P = evPt(e); S.hover = P;
-  if (!drag) { if (S.guide) { const gh = guideHit(P.x, P.y); stage.style.cursor = gh === 'rotate' ? 'alias' : gh === 'move' || (gh === 'edge' && S.tool !== 'ink') ? 'move' : ''; invalidate('live'); } if (S.tool === 'eraser' || S.tool === 'laser' || (S.tool === 'ink' && S.tablet.ring) || S.tool === 'sym') invalidate('live'); return; }
+  if (!drag) { if (S.guide) { const gh = guideHit(P.x, P.y); stage.style.cursor = gh === 'rotate' ? 'alias' : gh === 'move' || (gh === 'edge' && S.tool !== 'ink') ? 'move' : baseCursor; invalidate('live'); } if (S.tool === 'eraser' || S.tool === 'laser' || S.tool === 'sym') invalidate('live'); return; }
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
   switch (drag.mode) {
     case 'pan': S.view.x = drag.vx + e.clientX - drag.sx; S.view.y = drag.vy + e.clientY - drag.sy; S.autoFit = false; viewChanged(); return;
@@ -1084,7 +1080,7 @@ function renderDock() {
     `<div class="sizes">${sz.vals.map((v, i) => `<button class="size${Math.abs(sz.cur - v) < 0.01 ? ' on' : ''}" data-size="${v}" title="Size ${v}"><i style="width:${4 + i * 5}px;height:${4 + i * 5}px"></i></button>`).join('')}</div>` +
     '<div class="sep"></div>' +
     `<button class="tool" data-act="undo" title="Undo (Cmd+Z)">${icon('undo')}</button><button class="tool" data-act="redo" title="Redo (Cmd+Shift+Z)">${icon('redo')}</button>`;
-  stage.className = 't-' + t;
+  stage.className = 't-' + t; updateCursor();
 }
 /* drag pens and colour swatches to rearrange them */
 let dockDrag = null, suppressDockClick = false;
@@ -1950,7 +1946,7 @@ function openTablet() {
   const mi = card.querySelector('[data-min]'); mi.oninput = () => { T.min = +mi.value; mi.nextElementSibling.textContent = Math.round(T.min * 100) + '%'; savePrefs(); };
   card.querySelectorAll('select[data-k]').forEach(s => s.onchange = () => { T[s.dataset.k] = s.value; savePrefs(); });
   card.querySelector('[data-snap]').onchange = e => { T.snap = e.target.checked; savePrefs(); };
-  card.querySelector('[data-ring]').onchange = e => { T.ring = e.target.checked; savePrefs(); invalidate('live'); };
+  card.querySelector('[data-ring]').onchange = e => { T.ring = e.target.checked; savePrefs(); updateCursor(); };
   card.querySelector('[data-scrib]').onchange = e => { T.scribble = e.target.checked; savePrefs(); };
   card.querySelector('[data-finger]').onchange = e => { T.fingerDraw = e.target.checked; savePrefs(); };
 }
@@ -2257,6 +2253,40 @@ $('#selBar').addEventListener('click', e => {
   if (act === 'rotl') rotSel(-15); else if (act === 'rotr') rotSel(15); else if (act === 'flip') flipSel();
   else if (/^(row|col)[+-]$|^head$/.test(act) && its.length === 1 && its[0].t === 'table') tableEdit(its[0].id, act);
 });
+
+/* ================= cursor: the pen-size ring is the real system cursor (moves in sync, no shake) ================= */
+let baseCursor = '';
+function updateCursor() {
+  baseCursor = '';
+  if (S.tool === 'ink' && S.tablet.ring && S.nb) {
+    const p = activePreset(), d = clamp(Math.round((p?.size || 3) * S.view.scale), 5, 110), W = d + 6, c = W / 2;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${W}'><circle cx='${c}' cy='${c}' r='${d / 2}' fill='none' stroke='white' stroke-width='2.6'/><circle cx='${c}' cy='${c}' r='${d / 2}' fill='none' stroke='%23111' stroke-width='1.1'/><circle cx='${c}' cy='${c}' r='1.3' fill='%23111'/></svg>`;
+    baseCursor = `url("data:image/svg+xml,${svg.replace(/</g, '%3C').replace(/>/g, '%3E').replace(/"/g, "'")}") ${c} ${c}, crosshair`;
+  }
+  stage.style.cursor = baseCursor;
+}
+
+/* ================= fast strokes: only draw what's new each frame ================= */
+function canDrawIncrementally(d) {
+  const it = d.item, st = STYLES[it.style] || STYLES.ballpoint;
+  const varies = (it.sim || it.pts.some(p => p[2] !== 0.5)) && st.thinning > 0.05;
+  return !it.hl && (it.opacity ?? 1) >= 1 && !varies && !S.laser.length;
+}
+function drawInkIncrement(ctx, d) {
+  const it = d.item, pts = it.pts, v = S.view, key = v.scale + ',' + v.x + ',' + v.y;
+  if (!d.inc || d.inc.key !== key) {
+    clearCtx(ctx); setView(ctx); drawGuide(ctx, v.scale); drawLiveInk(ctx, it);
+    d.inc = { key, i: Math.max(1, pts.length - 1) }; return;
+  }
+  if (pts.length - 2 < d.inc.i) return;
+  setView(ctx); ctx.globalAlpha = 1; ctx.strokeStyle = fixC(it.color); ctx.lineWidth = it.size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let i = d.inc.i; i <= pts.length - 2; i++) {
+    const a = i === 1 ? pts[0] : [(pts[i - 1][0] + pts[i][0]) / 2, (pts[i - 1][1] + pts[i][1]) / 2];
+    ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2);
+  }
+  ctx.stroke(); d.inc.i = pts.length - 1;
+}
 
 /* ================= scribble to erase ================= */
 function scribblePoints(pts) {
