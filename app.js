@@ -60,6 +60,7 @@ const IC = {
   header: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18" stroke-width="3"/>',
   timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/>',
   play: '<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>', pause: '<path d="M7 5v14M17 5v14" stroke-width="3"/>',
+  eraserp: '<path d="M7 18l-4.3-4.3a2.4 2.4 0 0 1 0-3.4l6.6-6.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 18"/><path d="M3 22h2.5M8.5 22H11M14 22h2.5M19.5 22H21"/>',
   ruler: '<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
   protractor: '<path d="M3 18a9 9 0 0 1 18 0z"/><path d="M12 18l4-6M12 14v4"/>',
   bookmark: '<path d="M6 3h12v18l-6-4-6 4z"/>',
@@ -847,19 +848,28 @@ function eraseAt(x, y) {
   for (const it of page.items) {
     if ((S.eraser.mode === 'hl' && !it.hl) || !itemHit(it, x, y, r)) { out.push(it); continue; }
     changed = true;
-    if (S.eraser.mode === 'partial' && it.t === 'ink') {
+    const src = S.eraser.mode === 'partial' && it.t === 'shape' && SPLITTABLE.test(it.kind) ? shapeToInk(it) : it;
+    if (S.eraser.mode === 'partial' && src.t === 'ink') {
       const dense = [];
-      it.pts.forEach((p, i) => {
-        if (i) { const q = it.pts[i - 1], n = Math.floor(Math.hypot(p[0] - q[0], p[1] - q[1]) / (r / 2)); for (let k = 1; k < n; k++) dense.push([q[0] + (p[0] - q[0]) * k / n, q[1] + (p[1] - q[1]) * k / n, q[2] + (p[2] - q[2]) * k / n]); }
+      src.pts.forEach((p, i) => {
+        if (i) { const q = src.pts[i - 1], n = Math.floor(Math.hypot(p[0] - q[0], p[1] - q[1]) / (r / 2)); for (let k = 1; k < n; k++) dense.push([q[0] + (p[0] - q[0]) * k / n, q[1] + (p[1] - q[1]) * k / n, q[2] + (p[2] - q[2]) * k / n]); }
         dense.push(p);
       });
-      const lim = r + it.size * 0.35; let run = [];
-      const flush = () => { if (run.length > 1) out.push({ ...it, id: uid(), pts: run }); run = []; };
+      const lim = r + src.size * 0.35; let run = [];
+      const flush = () => { if (run.length > 1) out.push({ ...src, id: uid(), pts: run }); run = []; };
       for (const p of dense) { if (Math.hypot(p[0] - x, p[1] - y) < lim) flush(); else run.push(p); }
       flush();
     }
   }
   if (changed) { page.items = out; invalidate('ink'); }
+}
+// Precise eraser on shapes: turn the outline into an erasable stroke (a circle can become a semicircle).
+const SPLITTABLE = /^(line|rect|ellipse|triangle|diamond)$/;
+function shapeToInk(s) {
+  const P = itemPolys(s)[0], step = Math.max(2, s.size), pts = [];
+  for (let i = 1; i < P.length; i++) { const a = P[i - 1], b = P[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / step)); for (let k = 0; k < n; k++) pts.push([r2(a[0] + (b[0] - a[0]) * k / n), r2(a[1] + (b[1] - a[1]) * k / n), 0.5]); }
+  const L = P[P.length - 1]; pts.push([r2(L[0]), r2(L[1]), 0.5]);
+  return { id: uid(), t: 'ink', hl: !!s.hl, color: s.color, size: s.size, opacity: s.opacity ?? 1, style: 'marker', sim: false, pts };
 }
 function topItemAt(x, y) { const r = 5 / S.view.scale; const its = curPage().items; for (let i = its.length - 1; i >= 0; i--) if (itemHit(its[i], x, y, r)) return its[i]; return null; }
 function lassoSelect(poly, add) {
@@ -1063,7 +1073,8 @@ function renderDock() {
     '<div class="sep"></div>' +
     [['line', 's_line', 'Straight line in your pen colour', false], ['arrow', 's_arrow', 'Arrow in your pen colour', false], ['darrowd', 's_darrowd', 'Dashed arrow in your pen colour', true], ['rect', 's_rect', 'Rectangle in your pen colour (Shift = square)', false], ['ellipse', 's_ellipse', 'Circle / ellipse in your pen colour (Shift = circle)', false], ['triangle', 's_triangle', 'Triangle in your pen colour', false]].map(([q, ic, tt, dash]) => `<button class="tool qs${t === 'shape' && S.shape.kind === (q === 'darrowd' ? 'arrow' : q) && !!S.shape.dash === dash ? ' on' : ''}" data-qs="${q}" title="${tt}" style="color:${lum(penColor()) < 0.3 ? '#e9ebf0' : penColor()}">${icon(ic)}</button>`).join('') +
     '<div class="sep"></div>' +
-    b('eraser', 'eraser', 'Eraser (E) — click again for options', '<span class="caret"></span>') +
+    `<button class="tool${t === 'eraser' && S.eraser.mode !== 'partial' ? ' on' : ''}" data-er="stroke" title="Eraser: whole strokes (E) — click again for options">${icon('eraser')}<span class="caret"></span></button>` +
+    `<button class="tool${t === 'eraser' && S.eraser.mode === 'partial' ? ' on' : ''}" data-er="partial" title="Precise eraser: erase part of a stroke or shape (Shift+E)">${icon('eraserp')}</button>` +
     b('shape', 's_' + S.shape.kind, 'Shapes & arrows (A/R/O/I) — click again for options', '<span class="caret"></span>') +
     `<button class="tool${t === 'sym' ? ' on' : ''}" data-act="phys" title="Shapes & physics library (K)">${icon('atom')}</button>` +
     b('text', 'text', 'Text (T)') +
@@ -1079,6 +1090,7 @@ function renderDock() {
 }
 dock.addEventListener('click', e => {
   const el = e.target.closest('button'); if (!el) return;
+  if (el.dataset.er) { if (S.tool === 'eraser' && (S.eraser.mode === 'partial') === (el.dataset.er === 'partial')) return openToolPopover('eraser', el); S.eraser.mode = el.dataset.er; savePrefs(); return setTool('eraser'); }
   if (el.dataset.tool) {
     const tl = el.dataset.tool;
     if (S.tool === tl && ['eraser', 'shape', 'text', 'laser'].includes(tl)) return openToolPopover(tl, el);
@@ -2380,7 +2392,7 @@ window.addEventListener('keydown', e => {
     case 'home': gotoPage(0); break; case 'end': gotoPage(S.nb.pages.length - 1); break;
     case 'p': selectPreset(S.presets.find(p => p.id === S.lastPen && p.kind === 'pen')?.id || S.presets.find(p => p.kind === 'pen')?.id || S.presets[0].id); break;
     case 'h': { const h = S.presets.find(p => p.id === S.lastHl && p.kind === 'highlighter') || S.presets.find(p => p.kind === 'highlighter'); if (h) selectPreset(h.id); break; }
-    case 'e': setTool('eraser'); break; case 'v': setTool('select'); break; case 't': setTool('text'); break;
+    case 'e': if (e.shiftKey) S.eraser.mode = 'partial'; else if (S.eraser.mode === 'partial' && S.tool !== 'eraser') S.eraser.mode = 'stroke'; savePrefs(); setTool('eraser'); break; case 'v': setTool('select'); break; case 't': setTool('text'); break;
     case 'l': { const lp = S.presets.find(p => p.kind === 'laser'); if (lp) selectPreset(lp.id); else setTool('laser'); break; }
     case 'a': S.shape.kind = 'arrow'; savePrefs(); setTool('shape'); break;
     case 'r': S.shape.kind = 'rect'; savePrefs(); setTool('shape'); break;
