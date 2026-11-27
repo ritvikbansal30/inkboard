@@ -291,3 +291,10 @@ body.present #stage{background:#000}
 .tpresets .pbtn{padding:8px 4px}
 html,body,#stage{-webkit-touch-callout:none;overscroll-behavior:none}
 @media(max-width:1360px){#btnTimer{font-size:0;gap:0;padding:0 9px}}
+
+/* dock reordering */
+#dock .nib,#dock .pslot,#dock .sw{touch-action:none}
+.dock-ghost{position:fixed;z-index:70;pointer-events:none;opacity:.9;transform:scale(1.12);filter:drop-shadow(0 6px 12px rgba(0,0,0,.5))}
+#dock .dragging{opacity:.25}
+#dock .drop-before{box-shadow:-3px 0 0 0 var(--accent2)}
+#dock .drop-after{box-shadow:3px 0 0 0 var(--accent2)}

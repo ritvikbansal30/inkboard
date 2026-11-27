@@ -156,6 +156,7 @@ const S = {
   penBar: LS.get('penBar', 'pens'),
   tabletKeys: LS.get('tabletKeys', null) || DEFAULT_TKEYS.map(r => ({ ...r })),
   guide: null, laserStroke: 0, panCode: null,
+  quick: LS.get('quick', null) || QUICK.slice(),
   sym: Object.assign({ kind: 'proton', chapter: 'modern', color: '#111111', nat: true, size: 2.5 }, LS.get('sym', {})),
   view: { scale: 1, x: 0, y: 0 },
   sel: new Set(),
@@ -163,7 +164,7 @@ const S = {
   hover: null, laser: [], editingText: null, hiddenId: null, present: false,
 };
 const activePreset = () => S.presets.find(p => p.id === S.activePreset) || S.presets[0];
-const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); LS.set('tablet', S.tablet); LS.set('laser', S.laserCfg); LS.set('penBar', S.penBar); LS.set('tabletKeys', S.tabletKeys); LS.set('sym', S.sym); LS.set('presetsVer', 3); };
+const savePrefs = () => { LS.set('presets', S.presets); LS.set('activePreset', S.activePreset); LS.set('lastPen', S.lastPen); LS.set('lastHl', S.lastHl); LS.set('shape', S.shape); LS.set('text', S.text); LS.set('eraser', S.eraser); LS.set('recent', S.recent); LS.set('defaultBg', S.defaultBg); LS.set('pageSize', S.pageSize); LS.set('tablet', S.tablet); LS.set('laser', S.laserCfg); LS.set('penBar', S.penBar); LS.set('tabletKeys', S.tabletKeys); LS.set('sym', S.sym); LS.set('presetsVer', 3); LS.set('quick', S.quick); };
 const curPage = () => S.nb.pages[S.pageIdx];
 
 /* ================= geometry: items → drawable ops ================= */
@@ -1079,8 +1080,9 @@ function renderDock() {
     `<button class="tool${t === 'sym' ? ' on' : ''}" data-act="phys" title="Shapes & physics library (K)">${icon('atom')}</button>` +
     b('text', 'text', 'Text (T)') +
     `<button class="tool${S.guide ? ' on' : ''}" data-act="guide" title="Ruler & protractor (G)">${icon('ruler')}<span class="caret"></span></button>` +
+    `<button class="tool${typeof timerEl !== 'undefined' && !timerEl.hidden ? ' on' : ''}" data-act="timer" title="Class timer">${icon('timer')}</button>` +
     '<div class="sep"></div>' +
-    QUICK.map(c => `<button class="sw${cc && cc.toLowerCase() === c ? ' on' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('') +
+    S.quick.map(c => `<button class="sw${cc && cc.toLowerCase() === c ? ' on' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('') +
     `<button class="sw more" data-act="colors" title="More colours"></button>` +
     '<div class="sep"></div>' +
     `<div class="sizes">${sz.vals.map((v, i) => `<button class="size${Math.abs(sz.cur - v) < 0.01 ? ' on' : ''}" data-size="${v}" title="Size ${v}"><i style="width:${4 + i * 5}px;height:${4 + i * 5}px"></i></button>`).join('')}</div>` +
@@ -1088,7 +1090,33 @@ function renderDock() {
     `<button class="tool" data-act="undo" title="Undo (Cmd+Z)">${icon('undo')}</button><button class="tool" data-act="redo" title="Redo (Cmd+Shift+Z)">${icon('redo')}</button>`;
   stage.className = 't-' + t;
 }
+/* drag pens and colour swatches to rearrange them */
+let dockDrag = null, suppressDockClick = false;
+dock.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-preset], .sw[data-color]'); if (!el || (e.button !== 0 && e.pointerType === 'mouse')) return;
+  dockDrag = { el, kind: el.dataset.preset ? 'preset' : 'color', id: el.dataset.preset || el.dataset.color, sx: e.clientX, sy: e.clientY, pid: e.pointerId, started: false, idx: null };
+});
+window.addEventListener('pointermove', e => {
+  const d = dockDrag; if (!d || e.pointerId !== d.pid) return;
+  if (!d.started) {
+    if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 8) return;
+    d.started = true; d.ghost = d.el.cloneNode(true); d.ghost.classList.add('dock-ghost'); document.body.appendChild(d.ghost); d.el.classList.add('dragging');
+  }
+  d.ghost.style.left = e.clientX - d.el.offsetWidth / 2 + 'px'; d.ghost.style.top = e.clientY - d.el.offsetHeight / 2 + 'px';
+  const items = [...dock.querySelectorAll(d.kind === 'preset' ? '[data-preset]' : '.sw[data-color]')];
+  let idx = items.length; for (let i = 0; i < items.length; i++) { const r = items[i].getBoundingClientRect(); if (e.clientX < r.left + r.width / 2) { idx = i; break; } }
+  d.idx = idx; items.forEach((it, i) => { it.classList.toggle('drop-before', i === idx); it.classList.toggle('drop-after', idx === items.length && i === items.length - 1); });
+});
+window.addEventListener('pointerup', e => {
+  const d = dockDrag; if (!d || e.pointerId !== d.pid) return; dockDrag = null;
+  if (!d.started) return;
+  d.ghost.remove(); suppressDockClick = true; setTimeout(() => { suppressDockClick = false; }, 0);
+  const list = d.kind === 'preset' ? S.presets : S.quick, from = list.findIndex(x => (d.kind === 'preset' ? x.id : x) === d.id);
+  if (from >= 0 && d.idx != null) { const [m] = list.splice(from, 1); list.splice(d.idx > from ? d.idx - 1 : d.idx, 0, m); savePrefs(); toast('New order saved', 900); }
+  renderDock();
+});
 dock.addEventListener('click', e => {
+  if (suppressDockClick) return;
   const el = e.target.closest('button'); if (!el) return;
   if (el.dataset.er) { if (S.tool === 'eraser' && (S.eraser.mode === 'partial') === (el.dataset.er === 'partial')) return openToolPopover('eraser', el); S.eraser.mode = el.dataset.er; savePrefs(); return setTool('eraser'); }
   if (el.dataset.tool) {
@@ -1107,6 +1135,7 @@ dock.addEventListener('click', e => {
   else if (el.dataset.act === 'addpen') { const p = { ...activePreset(), id: uid() }; S.presets.push(p); S.activePreset = p.id; S.tool = 'ink'; savePrefs(); renderDock(); openPenPopover(dock.querySelector(`[data-preset="${p.id}"]`)); toast('New pen added'); }
   else if (el.dataset.act === 'guide') openGuideMenu(el);
   else if (el.dataset.act === 'phys') toggleLib();
+  else if (el.dataset.act === 'timer') toggleTimer();
   else if (el.dataset.act === 'undo') undo(); else if (el.dataset.act === 'redo') redo();
 });
 dock.addEventListener('dblclick', e => { const el = e.target.closest('[data-preset]'); if (el) openPenPopover(el); });
@@ -1129,7 +1158,7 @@ function quickShape(q) {
   const [kind, dash] = q === 'darrowd' ? ['arrow', true] : [q, false], pen = S.presets.find(p => p.id === S.lastPen && p.kind === 'pen');
   Object.assign(S.shape, { kind, dash, color: penColor(), size: Math.max(2, (pen?.size || 2) * 1.15) }); savePrefs(); setTool('shape');
 }
-function pushRecent(c) { c = c.toLowerCase(); if (PALETTE.includes(c) || QUICK.includes(c)) return; S.recent = [c, ...S.recent.filter(x => x !== c)].slice(0, 10); }
+function pushRecent(c) { c = c.toLowerCase(); if (PALETTE.includes(c) || S.quick.includes(c)) return; S.recent = [c, ...S.recent.filter(x => x !== c)].slice(0, 10); }
 function applyColor(c) {
   if (S.sel.size) { recolorSel(c); return; }
   if (S.tool === 'sym') { S.sym.color = c; S.sym.nat = false; if (!lib.hidden) renderLib(); }
@@ -2342,7 +2371,7 @@ function openTimer() {
   timerEl.hidden = false; placeTimer(); renderTimer();
   timerEl.querySelector('[data-t=play]').onclick = timerPlay;
   timerEl.querySelector('[data-t=reset]').onclick = timerReset;
-  timerEl.querySelector('[data-t=close]').onclick = () => { timerReset(); timerEl.hidden = true; };
+  timerEl.querySelector('[data-t=close]').onclick = () => { timerReset(); timerEl.hidden = true; renderDock(); };
   timerEl.querySelector('.tm-time').onclick = e => openPopover(e.currentTarget, `<h4>Timer</h4>
     <div class="tpresets">${[[30, '30 s'], [60, '1 min'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [600, '10 min'], [900, '15 min'], [1800, '30 min']].map(([s, l]) => `<button class="pbtn" data-s="${s}">${l}</button>`).join('')}</div>
     <div class="row" style="margin-top:10px"><label>Custom</label><input type="number" min="1" max="180" value="${Math.round(TM.total / 60)}" data-min style="width:70px;height:32px;background:#121418;border:1px solid var(--line);border-radius:8px;padding:0 8px"><span class="val">min</span><button class="pbtn primary" data-go style="flex:none">Start</button></div>
@@ -2359,7 +2388,7 @@ function openTimer() {
     grip.onpointerup = () => { grip.onpointermove = null; LS.set('timer', { mode: TM.mode, total: TM.total, x: TM.x, y: TM.y }); };
   };
 }
-function toggleTimer() { if (timerEl.hidden) openTimer(); else { timerReset(); timerEl.hidden = true; } }
+function toggleTimer() { if (timerEl.hidden) openTimer(); else { timerReset(); timerEl.hidden = true; } renderDock(); }
 $('#btnTimer').onclick = toggleTimer;
 window.addEventListener('resize', () => { if (!timerEl.hidden) placeTimer(); });
 
