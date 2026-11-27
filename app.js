@@ -514,28 +514,24 @@ function drawLive() {
   const col = a => `rgba(${lr},${lg},${lb},${a})`, inkMode = LC.mode === 'ink', LIFE = inkMode ? LC.fade * 1000 : 900, FADE = 700;
   if (S.laser.length) {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // batched glow: a wide soft stroke + a bright core per fade level (no per-segment shadow blur, so it stays smooth)
+    const glow = (path, a) => { ctx.strokeStyle = col(a * 0.3); ctx.lineWidth = 9 * k / sc; ctx.stroke(path); ctx.strokeStyle = col(a); ctx.lineWidth = 3.2 * k / sc; ctx.stroke(path); ctx.strokeStyle = `rgba(255,255,255,${0.55 * a})`; ctx.lineWidth = 1.1 * k / sc; ctx.stroke(path); };
     if (inkMode) {
       const live = drag?.mode === 'laser' ? S.laserStroke : -1, groups = new Map(), keep = [];
       for (const q of S.laser) { let g = groups.get(q.s); if (!g) groups.set(q.s, g = []); g.push(q); }
-      for (const [s, pts] of groups) {
-        const age = s === live ? 0 : now - pts[pts.length - 1].t, a = 1 - clamp((age - LIFE) / FADE, 0, 1);
+      for (const [s2, pts] of groups) {
+        const age = s2 === live ? 0 : now - pts[pts.length - 1].t, a = 1 - clamp((age - LIFE) / FADE, 0, 1);
         if (a <= 0) continue; keep.push(...pts);
-        ctx.shadowColor = col(0.75 * a); ctx.shadowBlur = 10 * DPR() * k; ctx.strokeStyle = col(a); ctx.lineWidth = 4.5 * k / sc;
-        ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); if (pts.length === 1) ctx.lineTo(pts[0].x + 0.01, pts[0].y); ctx.stroke();
-        ctx.shadowBlur = 0; ctx.strokeStyle = `rgba(255,255,255,${0.55 * a})`; ctx.lineWidth = 1.4 * k / sc; ctx.stroke();
+        const path = new Path2D(); pts.forEach((q, i) => i ? path.lineTo(q.x, q.y) : path.moveTo(q.x, q.y)); if (pts.length === 1) path.lineTo(pts[0].x + 0.01, pts[0].y);
+        glow(path, a);
       }
       S.laser = keep;
     } else {
       S.laser = S.laser.filter(q => now - q.t < LIFE);
-      ctx.shadowColor = col(0.9); ctx.shadowBlur = 14 * DPR() * k;
-      for (let i = 1; i < S.laser.length; i++) {
-        const a = S.laser[i - 1], b = S.laser[i]; if (a.s !== b.s) continue;
-        const age = 1 - (now - b.t) / LIFE;
-        ctx.strokeStyle = col(age); ctx.lineWidth = (2 + 5 * age) * k / sc;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      }
+      const B = 6, paths = Array.from({ length: B }, () => new Path2D());
+      for (let i = 1; i < S.laser.length; i++) { const a = S.laser[i - 1], b2 = S.laser[i]; if (a.s !== b2.s) continue; const j = Math.min(B - 1, Math.floor((1 - (now - b2.t) / LIFE) * B)); paths[j].moveTo(a.x, a.y); paths[j].lineTo(b2.x, b2.y); }
+      paths.forEach((path, j) => glow(path, (j + 1) / B));
     }
-    ctx.shadowBlur = 0;
   }
   if (h && S.tool === 'laser') {
     if (LC.mode === 'spot') {
@@ -706,7 +702,7 @@ stage.addEventListener('pointermove', e => {
     case 'ink': {
       const pr = activePreset();
       for (const ev of evs.length ? evs : [e]) { const q = evPt(ev), [qx, qy] = drag.snap ? guideSnap(q.x, q.y, drag.item.size) : [q.x, q.y]; drag.item.pts.push([r2(qx), r2(qy), pressureOf(ev, pr)]); }
-      drag.pred = (e.getPredictedEvents ? e.getPredictedEvents() : []).slice(0, 3).map(ev => { const q = evPt(ev); return [r2(q.x), r2(q.y), pressureOf(ev, pr)]; });
+      drag.pred = null;
       if (drag.snap) drag.pred = [];
       if (drag.straight) { const a = drag.item.pts[0], y = Math.abs(P.y - a[1]) < Math.abs(P.x - a[0]) * 0.3 ? a[1] : P.y; drag.item.pts = [a, [r2(P.x), r2(y), a[2]]]; drag.pred = []; }
       if (S.tablet.snap && !drag.snap && !drag.straight && Math.hypot(P.sx - drag.anchor.sx, P.sy - drag.anchor.sy) > 5) { drag.anchor = { sx: P.sx, sy: P.sy }; clearTimeout(drag.holdT); drag.holdT = setTimeout(holdSnap, HOLD_MS); }
@@ -746,7 +742,7 @@ stage.addEventListener('pointermove', e => {
       curPage().items = drag.before.map(it => S.sel.has(it.id) ? transformItem(it, (x, y) => [ax + (x - ax) * s, ay + (y - ay) * s], s) : it);
       drag.moved = true; invalidate('ink'); break;
     }
-    case 'laser': if (S.laserCfg.mode === 'trail' || S.laserCfg.mode === 'ink') for (const ev of evs.length ? evs : [e]) { const q = evPt(ev); S.laser.push({ x: q.x, y: q.y, t: performance.now(), s: S.laserStroke }); } break;
+    case 'laser': if (S.laserCfg.mode === 'trail' || S.laserCfg.mode === 'ink') for (const ev of evs.length ? evs : [e]) { const q = evPt(ev), L = S.laser[S.laser.length - 1]; if (!L || L.s !== S.laserStroke || Math.hypot(q.x - L.x, q.y - L.y) > 1.5 / S.view.scale) S.laser.push({ x: q.x, y: q.y, t: performance.now(), s: S.laserStroke }); } break;
   }
   invalidate('live');
 });
