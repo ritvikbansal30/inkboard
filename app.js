@@ -339,7 +339,7 @@ function transformItem(it, f, s = 1) {
   const n = { ...it };
   if (it.t === 'ink') { n.pts = it.pts.map(p => { const [x, y] = f(p[0], p[1]); return [r2(x), r2(y), p[2]]; }); n.size = it.size * s; }
   else if (it.t === 'shape') { [n.x1, n.y1] = f(it.x1, it.y1); [n.x2, n.y2] = f(it.x2, it.y2); n.size = it.size * s; }
-  else { [n.x, n.y] = f(it.x, it.y); n.w = it.w * s; n.h = it.h * s; if (it.t === 'text' || it.t === 'table') n.fs = it.fs * s; if (it.t === 'sym') n.size = (it.size || 2.5) * s; }
+  else { [n.x, n.y] = f(it.x, it.y); n.w = it.w * s; n.h = it.h * s; if (it.t === 'text' || it.t === 'table') n.fs = it.fs * s; }
   return n;
 }
 
@@ -481,7 +481,7 @@ function drawLive() {
   if (drag?.mode === 'ink') drawOps(ctx, computeOps(drag.pred?.length ? { ...drag.item, pts: drag.item.pts.concat(drag.pred) } : drag.item, true));
   if (drag?.mode === 'shape') drawOps(ctx, computeOps(drag.s));
   if (drag?.mode === 'sym') { if (drag.s.w > 2) drawOps(ctx, symOps(drag.s)); }
-  else if (!drag && S.hover && S.tool === 'sym' && SYMS[S.sym.kind]) { const d = SYMS[S.sym.kind]; drawOps(ctx, symOps(newSym(S.sym.kind, S.hover.x - d.w / 2, S.hover.y - d.h / 2)), 0.4); }
+  else if (!drag && S.hover && S.tool === 'sym' && SYMS[S.sym.kind]) { const g0 = newSym(S.sym.kind, 0, 0); g0.x = S.hover.x - g0.w / 2; g0.y = S.hover.y - g0.h / 2; drawOps(ctx, symOps(g0), 0.4); }
   if (drag?.mode === 'lasso' && drag.pts.length > 1) {
     ctx.beginPath(); drag.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
     ctx.fillStyle = 'rgba(8,189,128,.08)'; ctx.fill(); ctx.setLineDash([6 / sc, 5 / sc]); ctx.lineWidth = 1.5 / sc; ctx.strokeStyle = '#08bd80'; ctx.stroke(); ctx.setLineDash([]);
@@ -714,6 +714,7 @@ stage.addEventListener('pointermove', e => {
     }
     case 'sym': {
       const d = SYMS[drag.s.kind]; let w = P.x - drag.ax, h = P.y - drag.ay;
+      if (!drag.s.size) drag.s.size = S.sym.size;
       if (!!d.lock !== e.shiftKey) { const k = Math.max(Math.abs(w) / d.w, Math.abs(h) / d.h); w = Math.sign(w || 1) * d.w * k; h = Math.sign(h || 1) * d.h * k; }
       Object.assign(drag.s, { x: Math.min(drag.ax, drag.ax + w), y: Math.min(drag.ay, drag.ay + h), w: Math.abs(w), h: Math.abs(h) }); break;
     }
@@ -761,7 +762,7 @@ const endDrag = e => {
     case 'erase': commit(page, d.before); break;
     case 'sym': {
       const s = d.s, def = SYMS[s.kind];
-      if (s.w < 8 / S.view.scale || s.h < 8 / S.view.scale) Object.assign(s, { w: def.w, h: def.h, x: d.ax - def.w / 2, y: d.ay - def.h / 2 });
+      if (s.w < 8 / S.view.scale || s.h < 8 / S.view.scale) { const k = placeScale(def.w, def.h); Object.assign(s, { w: def.w * k, h: def.h * k, x: d.ax - def.w * k / 2, y: d.ay - def.h * k / 2 }); }
       const before = page.items; page.items = [...before, { ...s, id: uid() }]; commit(page, before); invalidate('ink'); break;
     }
     case 'lasso': {
@@ -2080,7 +2081,9 @@ function wireKeyMap(card) {
 /* ================= physics & shapes library panel ================= */
 const lib = $('#lib');
 let libQ = '';
-function newSym(kind, x, y) { const d = SYMS[kind]; return { t: 'sym', kind, x, y, w: d.w, h: d.h, color: S.sym.color, size: S.sym.size, nat: S.sym.nat, rot: 0 }; }
+// New shapes start at a comfortable on-screen size, whatever the page size or zoom.
+const placeScale = (dw = 300, dh = 200) => { const p = curPage(); return clamp(Math.min(0.85 / S.view.scale, (p ? p.w * 0.45 : 1e4) / dw, (p ? p.h * 0.45 : 1e4) / dh), 0.5, 8); };
+function newSym(kind, x, y) { const d = SYMS[kind], k = placeScale(d.w, d.h); return { t: 'sym', kind, x, y, w: d.w * k, h: d.h * k, color: S.sym.color, size: S.sym.size, nat: S.sym.nat, rot: 0 }; }
 function toggleLib(force) {
   const show = force ?? lib.hidden;
   lib.hidden = !show;
@@ -2129,9 +2132,9 @@ function openTablePicker(anchor) {
   });
 }
 function insertTable(rows, cols) {
-  const p = curPage(), v = S.view, cw = 170, rh = 56, w = cols * cw, h = rows * rh;
+  const p = curPage(), v = S.view, k = placeScale(170 * cols, 56 * rows), cw = 170 * k, rh = 56 * k, w = cols * cw, h = rows * rh;
   const cx = clamp((stage.clientWidth / 2 - v.x) / v.scale, w / 2, Math.max(w / 2, p.w - w / 2)), cy = clamp((stage.clientHeight / 2 - v.y) / v.scale, h / 2, Math.max(h / 2, p.h - h / 2));
-  const it = { id: uid(), t: 'table', x: cx - w / 2, y: cy - h / 2, w, h, rows, cols, cells: Array.from({ length: rows }, () => Array(cols).fill('')), fs: 24, color: S.text.color, header: true };
+  const it = { id: uid(), t: 'table', x: cx - w / 2, y: cy - h / 2, w, h, rows, cols, cells: Array.from({ length: rows }, () => Array(cols).fill('')), fs: 24 * k, color: S.text.color, header: true };
   const before = p.items; p.items = [...before, it]; commit(p, before);
   setTool('select'); S.sel = new Set([it.id]); updateSelBar(); invalidate('ink');
   setTimeout(() => editCell(it, 0, 0), 30);

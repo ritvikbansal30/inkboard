@@ -6,9 +6,12 @@ const INK = '#111111';
 const PAPER = '#fffffe';   // 'paper' fill: white on light boards, board-coloured on dark ones
 const shade = hex => { const n = parseInt(hex.slice(1), 16), f = v => Math.round(v * 0.72); return '#' + [f((n >> 16) & 255), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); };
 
-function builder(it) {
-  const { x, y, w, h } = it, sw = it.size || 2.5, cx = w / 2, cy = h / 2, a = (it.rot || 0) * PI / 180, cs = Math.cos(a), sn = Math.sin(a), fl = it.flip ? -1 : 1;
-  const T = (lx, ly) => { const dx = (lx - cx) * fl, dy = ly - cy; return [r2(x + cx + dx * cs - dy * sn), r2(y + cy + dx * sn + dy * cs)]; };
+// Shapes are drawn in their design size (def.w × def.h) and mapped onto the placed box,
+// so lines, arrowheads and labels all grow together when a shape is enlarged.
+function builder(it, def) {
+  const { x, y } = it, w = def.w, h = def.h, sx = it.w / w, sy = it.h / h, k = Math.max(0.2, Math.sqrt(sx * sy)), sw = (it.size || 2.5) * k;
+  const a = (it.rot || 0) * PI / 180, cs = Math.cos(a), sn = Math.sin(a), fl = it.flip ? -1 : 1, cxw = x + it.w / 2, cyw = y + it.h / 2;
+  const T = (lx, ly) => { const dx = (lx - w / 2) * sx * fl, dy = (ly - h / 2) * sy; return [r2(cxw + dx * cs - dy * sn), r2(cyw + dx * sn + dy * cs)]; };
   let d = '';
   const pt = (c, lx, ly) => { const [X, Y] = T(lx, ly); d += c + X + ' ' + Y; };
   const g = {
@@ -37,9 +40,9 @@ function builder(it) {
     },
     stroke(color = INK, k = 1, o = {}) { if (d) g.ops.push({ d, stroke: color, width: sw * k, alpha: o.alpha ?? 1, dash: o.dash ? [sw * k * 3, sw * k * 2.4] : null }); d = ''; return g; },
     fill(color, alpha = 1, line, k = 0.7) { if (d) g.ops.push({ d, fill: color, fillAlpha: alpha, ...(line ? { stroke: line, width: sw * k, alpha: 1 } : {}) }); d = ''; return g; },
-    head(x1, y1, x2, y2, color = INK, L) { L = L || sw * 3.4 + 7; const an = Math.atan2(y2 - y1, x2 - x1); g.poly([[x2, y2], [x2 - L * Math.cos(an - 0.42), y2 - L * Math.sin(an - 0.42)], [x2 - L * Math.cos(an + 0.42), y2 - L * Math.sin(an + 0.42)]], true); return g.fill(color, 1); },
-    arrow(x1, y1, x2, y2, color = INK, k = 1, L, o = {}) { L = L || sw * 3.4 + 7; const D = Math.hypot(x2 - x1, y2 - y1) || 1; g.line(x1, y1, x2 - (x2 - x1) / D * L * 0.6, y2 - (y2 - y1) / D * L * 0.6).stroke(color, k, o); g.head(x1, y1, x2, y2, color, L); if (o.both) g.head(x2, y2, x1, y1, color, L); return g; },
-    text(lx, ly, s, fs, color = INK, o = {}) { const [X, Y] = T(lx, ly); g.ops.push({ text: s, x: X, y: Y, fs, fill: color, bold: o.bold, align: o.align || 'center', alpha: 1 }); return g; },
+    head(x1, y1, x2, y2, color = INK, L) { L = L || (it.size || 2.5) * 3.4 + 7; const an = Math.atan2(y2 - y1, x2 - x1); g.poly([[x2, y2], [x2 - L * Math.cos(an - 0.42), y2 - L * Math.sin(an - 0.42)], [x2 - L * Math.cos(an + 0.42), y2 - L * Math.sin(an + 0.42)]], true); return g.fill(color, 1); },
+    arrow(x1, y1, x2, y2, color = INK, k = 1, L, o = {}) { L = L || (it.size || 2.5) * 3.4 + 7; const D = Math.hypot(x2 - x1, y2 - y1) || 1; g.line(x1, y1, x2 - (x2 - x1) / D * L * 0.6, y2 - (y2 - y1) / D * L * 0.6).stroke(color, k, o); g.head(x1, y1, x2, y2, color, L); if (o.both) g.head(x2, y2, x1, y1, color, L); return g; },
+    text(lx, ly, s, fs, color = INK, o = {}) { const [X, Y] = T(lx, ly); g.ops.push({ text: s, x: X, y: Y, fs: r2(fs * k), fill: color, bold: o.bold, align: o.align || 'center', alpha: 1 }); return g; },
   };
   return g;
 }
@@ -319,7 +322,7 @@ export const SYMS = {
 
 export function symOps(it) {
   const def = SYMS[it.kind]; if (!def) return [];
-  const g = builder(it), col = it.color || INK, C = nat => (it.nat === false ? col : nat);
-  def.draw(g, it.w, it.h, C, col);
+  const g = builder(it, def), col = it.color || INK, C = nat => (it.nat === false ? col : nat);
+  def.draw(g, def.w, def.h, C, col);
   return g.ops;
 }
