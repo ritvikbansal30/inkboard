@@ -21,8 +21,10 @@ cat > "$APP/Contents/MacOS/Inkboard" <<SH
 #!/bin/zsh
 # Starts Inkboard's local server (if needed) and opens it in its own app window.
 cd "$DIR"
-# fetch the latest Inkboard from GitHub in the background (needs no action from you)
-( /usr/bin/git -C "$DIR" pull --ff-only -q >/dev/null 2>&1 & )
+# fetch the latest Inkboard from GitHub first (waits up to 5 s, so it never hangs offline)
+/usr/bin/git -C "$DIR" pull --ff-only -q >/dev/null 2>&1 &
+GP=\$!
+for i in {1..25}; do kill -0 \$GP 2>/dev/null || break; sleep 0.2; done
 PORT=8777
 if ! /usr/sbin/lsof -i :\$PORT >/dev/null 2>&1; then
   nohup /usr/bin/python3 -m http.server \$PORT --bind 127.0.0.1 >/dev/null 2>&1 &
